@@ -1,7 +1,7 @@
 import "server-only";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
-import type { Forecast, Localized, Model, Question, QuestionStatus } from "@/db/schema";
+import type { Forecast, Localized, MarketPrice, Model, Question, QuestionStatus } from "@/db/schema";
 import {
   bootstrapInterval,
   brier,
@@ -41,18 +41,29 @@ export type QuestionView = {
   latest: ModelForecast[];
   median: number | null;
   spread: number; // max minus min, the size of the disagreement
+  /** Latest prediction-market price for this question, if it has a market link. */
+  market: MarketPrice | null;
+  marketHistory: MarketPrice[];
 };
 
-function toView(question: Question, forecasts: Forecast[], models: Model[]): QuestionView {
+function toView(
+  question: Question,
+  forecasts: Forecast[],
+  models: Model[],
+  prices: MarketPrice[] = [],
+): QuestionView {
   // Show closed book on lists: every model takes part in it.
   const latest = latestPerModel(forecasts, models, "closed");
   const ps = latest.map((l) => l.forecast.probability);
+  const marketHistory = [...prices].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   return {
     question,
     forecasts,
     latest,
     median: ps.length ? median(ps) : null,
     spread: ps.length ? Math.max(...ps) - Math.min(...ps) : 0,
+    market: marketHistory[marketHistory.length - 1] ?? null,
+    marketHistory,
   };
 }
 
@@ -87,12 +98,26 @@ export async function listQuestions(
         rows.map((r) => r.id),
       ),
     );
+  const prices = await db
+    .select()
+    .from(schema.marketPrices)
+    .where(
+      inArray(
+        schema.marketPrices.questionId,
+        rows.map((r) => r.id),
+      ),
+    );
   const byQuestion = new Map<number, Forecast[]>();
   for (const f of fs) {
     if (!byQuestion.has(f.questionId)) byQuestion.set(f.questionId, []);
     byQuestion.get(f.questionId)!.push(f);
   }
-  return rows.map((q) => toView(q, byQuestion.get(q.id) ?? [], models));
+  const pricesByQuestion = new Map<number, MarketPrice[]>();
+  for (const p of prices) {
+    if (!pricesByQuestion.has(p.questionId)) pricesByQuestion.set(p.questionId, []);
+    pricesByQuestion.get(p.questionId)!.push(p);
+  }
+  return rows.map((q) => toView(q, byQuestion.get(q.id) ?? [], models, pricesByQuestion.get(q.id) ?? []));
 }
 
 export async function getQuestion(slug: string): Promise<(QuestionView & { models: Model[] }) | null> {
@@ -101,7 +126,8 @@ export async function getQuestion(slug: string): Promise<(QuestionView & { model
   if (!q) return null;
   const models = await getModels();
   const fs = await db.select().from(schema.forecasts).where(eq(schema.forecasts.questionId, q.id));
-  return { ...toView(q, fs, models), models };
+  const prices = await db.select().from(schema.marketPrices).where(eq(schema.marketPrices.questionId, q.id));
+  return { ...toView(q, fs, models, prices), models };
 }
 
 export async function hasMockData(): Promise<boolean> {
@@ -114,10 +140,20 @@ export async function hasMockData(): Promise<boolean> {
   return rows.length > 0;
 }
 
+/** The model whose final closed-book forecast was nearest to what happened. */
+export function closestModel(view: QuestionView): ModelForecast | null {
+  const q = view.question;
+  if (q.outcome === null || view.latest.length === 0) return null;
+  const target = q.outcome ? 1 : 0;
+  return [...view.latest].sort(
+    (a, b) => Math.abs(a.forecast.probability - target) - Math.abs(b.forecast.probability - target),
+  )[0];
+}
+
 /* ---------- Leaderboard ---------- */
 
 export type LeaderRow = {
-  id: string; // model id, or "panel" for the median of all models
+  id: string; // model id, "panel" for the median of all models, or "market"
   model: Model | null;
   resolved: number;
   meanBrier: number;
@@ -127,11 +163,19 @@ export type LeaderRow = {
   /** Average margin over the median model on the same questions. Positive is better. */
   relative: number;
   ranked: boolean;
+  /**
+   * Average Brier margin over the market on the questions both forecast.
+   * Positive means the model beat the market. Null when there is no overlap.
+   */
+  vsMarket: number | null;
+  sharedWithMarket: number;
 };
 
 export type Leaderboard = {
   rows: LeaderRow[];
   resolvedQuestions: number;
+  /** How many resolved questions had a market price. */
+  marketQuestions: number;
   /** Per-question Brier by model, used by the model profile. */
   perModel: Map<string, { question: Question; brier: number; final: number }[]>;
 };
@@ -142,6 +186,8 @@ export async function getLeaderboard(locale: Locale, track: Track): Promise<Lead
   const perModel = new Map<string, { question: Question; brier: number; final: number }[]>();
   const relative = new Map<string, number[]>();
   const panel: number[] = [];
+  const market: number[] = [];
+  const versusMarket = new Map<string, number[]>();
 
   for (const view of resolved) {
     const q = view.question;
@@ -167,6 +213,20 @@ export async function getLeaderboard(locale: Locale, track: Track): Promise<Lead
       relative.get(s.id)!.push(med - s.b);
     }
     panel.push(brier(median(scores.map((s) => s.final)), q.outcome));
+
+    // The market is scored exactly like a model: time-weighted over its price history.
+    const marketBrier = timeWeightedBrier(
+      view.marketHistory.map((p) => ({ probability: p.probability, at: p.createdAt })),
+      q.lockAt,
+      q.outcome,
+    );
+    if (marketBrier !== null) {
+      market.push(marketBrier);
+      for (const s of scores) {
+        if (!versusMarket.has(s.id)) versusMarket.set(s.id, []);
+        versusMarket.get(s.id)!.push(marketBrier - s.b);
+      }
+    }
   }
 
   const toRow = (id: string, model: Model | null, briers: number[], rel: number[]): LeaderRow => {
@@ -183,6 +243,8 @@ export async function getLeaderboard(locale: Locale, track: Track): Promise<Lead
       scoreHigh: ci ? prophecyScore(ci.low) : null,
       relative: rel.length ? mean(rel) : 0,
       ranked: briers.length >= MIN_RESOLVED_FOR_RANK,
+      vsMarket: versusMarket.get(id)?.length ? mean(versusMarket.get(id)!) : null,
+      sharedWithMarket: versusMarket.get(id)?.length ?? 0,
     };
   };
 
@@ -200,9 +262,10 @@ export async function getLeaderboard(locale: Locale, track: Track): Promise<Lead
     );
   }
   if (panel.length) rows.push(toRow("panel", null, panel, []));
+  if (market.length) rows.push(toRow("market", null, market, []));
   rows.sort((a, b) => Number(b.ranked) - Number(a.ranked) || b.score - a.score);
 
-  return { rows, resolvedQuestions: panel.length, perModel };
+  return { rows, resolvedQuestions: panel.length, marketQuestions: market.length, perModel };
 }
 
 export async function getModelProfile(id: string, locale: Locale) {

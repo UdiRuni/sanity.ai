@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import "@fontsource-variable/assistant";
-import "@fontsource-variable/frank-ruhl-libre";
+import "@fontsource-variable/rubik";
 import "../globals.css";
 import { Logo } from "@/components/Logo";
 import { localeFrom } from "@/i18n";
@@ -42,10 +41,12 @@ export default async function LocaleLayout({ children, params }: Props) {
             <nav className="site-nav" aria-label={site.name}>
               <Link href={`/${locale}/questions`}>{t.nav.questions}</Link>
               <Link href={`/${locale}/leaderboard`}>{t.nav.leaderboard}</Link>
-              <Link href={`/${locale}/suggest`}>{t.nav.suggest}</Link>
               <Link href={`/${locale}/about`}>{t.nav.about}</Link>
               <Link href={`/${other}`} className="locale" lang={other}>
                 {t.nav.otherLocale}
+              </Link>
+              <Link href={`/${locale}/suggest`} className="nav-cta">
+                {t.nav.suggest}
               </Link>
             </nav>
           </div>

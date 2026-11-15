@@ -1,18 +1,12 @@
 import Link from "next/link";
 import { site } from "@/lib/site";
 
-/**
- * The mark is the site's core idea in one shape: a probability rail with a
- * forecast sitting on it, right of the halfway tick.
- */
-export function LogoMark({ size = 32 }: { size?: number }) {
+/** A check mark in a rounded square: a sanity check. */
+export function LogoMark({ size = 34 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-      <rect width="32" height="32" rx="8" fill="#2343d8" />
-      <path d="M6 16h20" stroke="#fff" strokeWidth="3" strokeLinecap="round" />
-      <path d="M13 10.5v11" stroke="#fff" strokeOpacity=".5" strokeWidth="2" strokeLinecap="round" />
-      <circle cx="20.5" cy="16" r="5.6" fill="#fff" />
-      <circle cx="20.5" cy="16" r="2.4" fill="#2343d8" />
+      <rect width="32" height="32" rx="9" fill="#2f5bea" />
+      <path d="M9 16.6l4.6 4.6L23 11.4" fill="none" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

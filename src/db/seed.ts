@@ -146,6 +146,7 @@ export async function seed(db: Db, now = new Date()) {
     .onConflictDoNothing();
 
   const forecastRows: (typeof schema.forecasts.$inferInsert)[] = [];
+  const priceRows: (typeof schema.marketPrices.$inferInsert)[] = [];
 
   async function addQuestion(args: {
     slug: string;
@@ -172,6 +173,29 @@ export async function seed(db: Db, now = new Date()) {
       .returning({ id: schema.questions.id });
 
     const end = args.status === "open" ? now : args.lockAt;
+
+    // About two thirds of the demo questions also have a made-up market price.
+    if (hash(`mkt:${args.slug}`) < 0.66) {
+      const weeks = Math.max(1, Math.floor((end.getTime() - args.openAt.getTime()) / (7 * DAY)) + 1);
+      for (let w = 0; w < weeks; w++) {
+        const f = mockForecast({
+          questionSlug: args.slug,
+          modelId: "market",
+          track: "open",
+          round: w,
+          lang: args.lang,
+          skill: 0.72,
+          outcome: args.status === "resolved" ? args.outcome : undefined,
+        });
+        priceRows.push({
+          questionId: row.id,
+          probability: f.probability,
+          source: "polymarket",
+          mock: true,
+          createdAt: new Date(args.openAt.getTime() + w * 7 * DAY + 120_000),
+        });
+      }
+    }
     for (const m of modelRegistry) {
       const trackList = m.supportsOpenBook ? (["closed", "open"] as const) : (["closed"] as const);
       for (const track of trackList) {
@@ -304,6 +328,7 @@ export async function seed(db: Db, now = new Date()) {
     },
   ]);
 
+  if (priceRows.length) await db.insert(schema.marketPrices).values(priceRows);
   for (let i = 0; i < forecastRows.length; i += 200) {
     await db.insert(schema.forecasts).values(forecastRows.slice(i, i + 200));
   }

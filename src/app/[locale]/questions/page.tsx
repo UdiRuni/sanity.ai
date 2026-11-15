@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { QuestionRow } from "@/components/QuestionRow";
+import { QuestionCard } from "@/components/QuestionCard";
 import type { QuestionStatus } from "@/db/schema";
 import { localeFrom } from "@/i18n";
 import { listQuestions } from "@/lib/data";
+import { categories } from "@/lib/site";
 
 type Props = {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; topic?: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -23,10 +24,13 @@ const filters: Record<string, QuestionStatus[]> = {
 
 export default async function QuestionsPage({ params, searchParams }: Props) {
   const { locale, t } = localeFrom((await params).locale);
-  const requested = (await searchParams).status ?? "open";
-  const active = requested in filters ? requested : "open";
-  const views = await listQuestions(locale, filters[active]);
-  if (active === "resolved") {
+  const sp = await searchParams;
+  const status = sp.status && sp.status in filters ? sp.status : "open";
+  const topic = (categories as readonly string[]).includes(sp.topic ?? "") ? sp.topic! : null;
+
+  let views = await listQuestions(locale, filters[status]);
+  if (topic) views = views.filter((v) => v.question.category === topic);
+  if (status === "resolved") {
     views.sort(
       (a, b) => (b.question.resolvedAt?.getTime() ?? 0) - (a.question.resolvedAt?.getTime() ?? 0),
     );
@@ -37,33 +41,48 @@ export default async function QuestionsPage({ params, searchParams }: Props) {
     locked: t.questions.filterLocked,
     resolved: t.questions.filterResolved,
   };
+  const href = (s: string, c: string | null) =>
+    `/${locale}/questions?status=${s}${c ? `&topic=${c}` : ""}`;
 
   return (
     <>
       <h1>{t.questions.title}</h1>
-      <nav className="tabs" aria-label={t.questions.title}>
+
+      <nav className="pills" aria-label={t.questions.title} style={{ marginTop: "1.5rem" }}>
         {Object.keys(filters).map((key) => (
-          <Link
-            key={key}
-            className="tab"
-            href={`/${locale}/questions?status=${key}`}
-            aria-current={key === active ? "page" : undefined}
-          >
+          <Link key={key} className="pill" href={href(key, topic)} aria-current={key === status ? "page" : undefined}>
             {labels[key]}
           </Link>
         ))}
       </nav>
-      {views.length === 0 ? (
-        <p className="muted">
-          {t.questions.empty}{" "}
-          <Link className="link" href={`/${locale}/suggest`}>
-            {t.nav.suggest}
+
+      <p className="small muted" style={{ marginTop: "1.5rem", marginBottom: "0.5rem" }}>
+        {t.ui.exploreTitle}
+      </p>
+      <nav className="pills" aria-label={t.ui.exploreTitle}>
+        <Link className="pill" href={href(status, null)} aria-current={topic === null ? "page" : undefined}>
+          {t.ui.all}
+        </Link>
+        {categories.map((c) => (
+          <Link key={c} className="pill" href={href(status, c)} aria-current={c === topic ? "page" : undefined}>
+            {t.category[c]}
           </Link>
-        </p>
+        ))}
+      </nav>
+
+      {views.length === 0 ? (
+        <div className="panel soft" style={{ marginTop: "2rem", textAlign: "center", padding: "2.5rem 1.5rem" }}>
+          <p style={{ marginInline: "auto" }}>{topic ? t.ui.emptyCategory : t.questions.empty}</p>
+          <p style={{ marginTop: "1rem", marginInline: "auto" }}>
+            <Link className="btn" href={`/${locale}/suggest`}>
+              {t.ui.beFirst}
+            </Link>
+          </p>
+        </div>
       ) : (
-        <div className="q-list">
+        <div className="grid" style={{ marginTop: "2rem" }}>
           {views.map((v) => (
-            <QuestionRow key={v.question.id} view={v} t={t} locale={locale} />
+            <QuestionCard key={v.question.id} view={v} t={t} locale={locale} />
           ))}
         </div>
       )}

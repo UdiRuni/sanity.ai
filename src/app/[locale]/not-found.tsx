@@ -4,10 +4,10 @@ import Link from "next/link";
 export default function NotFound() {
   return (
     <div style={{ paddingBlock: "3rem" }}>
-      <svg width="120" height="40" viewBox="0 0 120 40" aria-hidden="true">
-        <path d="M6 28h108" stroke="#c9d0dc" strokeWidth="2" strokeLinecap="round" />
-        <path d="M60 22v12" stroke="#c9d0dc" strokeWidth="1.5" strokeLinecap="round" />
-        <circle cx="60" cy="10" r="6" fill="none" stroke="#2343d8" strokeWidth="2" strokeDasharray="3 3" />
+      <svg width="64" height="64" viewBox="0 0 32 32" aria-hidden="true">
+        <rect width="32" height="32" rx="9" fill="#e8eeff" />
+        <path d="M12.200 12.500a3.800 3.800 0 1 1 5.400 3.500c-1.100.5-1.600 1.200-1.600 2.400" fill="none" stroke="#2f5bea" strokeWidth="2.600" strokeLinecap="round" />
+        <circle cx="16" cy="22.400" r="1.600" fill="#2f5bea" />
       </svg>
       <h1 style={{ marginTop: "1.25rem" }}>הדף לא נמצא</h1>
       <p className="lead" style={{ marginTop: "0.5rem" }} lang="en" dir="ltr">

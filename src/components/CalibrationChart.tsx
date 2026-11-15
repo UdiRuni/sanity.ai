@@ -26,16 +26,16 @@ export function CalibrationChart({ bins, color, t }: { bins: CalibrationBin[]; c
     >
       {ticks.map((v) => (
         <g key={v}>
-          <line x1={x(0)} x2={x(1)} y1={y(v)} y2={y(v)} stroke="#e3e7ee" strokeWidth="1" />
-          <text x={x(0) - 8} y={y(v) + 4} textAnchor="end" fontSize="11" fill="#6b7689">
+          <line x1={x(0)} x2={x(1)} y1={y(v)} y2={y(v)} stroke="#e4e8f0" strokeWidth="1" />
+          <text x={x(0) - 8} y={y(v) + 4} textAnchor="end" fontSize="11" fill="#69748a">
             {Math.round(v * 100)}%
           </text>
-          <text x={x(v)} y={y(0) + 16} textAnchor="middle" fontSize="11" fill="#6b7689">
+          <text x={x(v)} y={y(0) + 16} textAnchor="middle" fontSize="11" fill="#69748a">
             {Math.round(v * 100)}%
           </text>
         </g>
       ))}
-      <line x1={x(0)} y1={y(0)} x2={x(1)} y2={y(1)} stroke="#c9d0dc" strokeWidth="1.5" strokeDasharray="4 4" />
+      <line x1={x(0)} y1={y(0)} x2={x(1)} y2={y(1)} stroke="#cbd3e1" strokeWidth="1.5" strokeDasharray="4 4" />
       <polyline
         fill="none"
         stroke={color}
@@ -58,7 +58,7 @@ export function CalibrationChart({ bins, color, t }: { bins: CalibrationBin[]; c
           </title>
         </circle>
       ))}
-      <text x={x(0.5)} y={size - 6} textAnchor="middle" fontSize="12" fill="#47526a">
+      <text x={x(0.5)} y={size - 6} textAnchor="middle" fontSize="12" fill="#4a5468">
         {t.model.said}
       </text>
       <text
@@ -66,7 +66,7 @@ export function CalibrationChart({ bins, color, t }: { bins: CalibrationBin[]; c
         y={y(0.5)}
         textAnchor="middle"
         fontSize="12"
-        fill="#47526a"
+        fill="#4a5468"
         transform={`rotate(-90 12 ${y(0.5)})`}
       >
         {t.model.happened}

@@ -10,6 +10,7 @@ import {
   adminLogin,
   adminLogout,
   approveQuestion,
+  recordMarketPrice,
   rejectQuestion,
   resolveQuestion,
   runRoundNow,
@@ -89,7 +90,7 @@ export default async function AdminPage({ params, searchParams }: Props) {
         </p>
       )}
 
-      <div className="panel wash" style={{ display: "flex", gap: "2.5rem", flexWrap: "wrap", alignItems: "center" }}>
+      <div className="panel soft" style={{ display: "flex", gap: "2.5rem", flexWrap: "wrap", alignItems: "center" }}>
         <div>
           <div className="figure">
             ${spent.toFixed(2)} <span className="muted" style={{ fontSize: "1rem" }}>/ ${budget}</span>
@@ -158,6 +159,10 @@ export default async function AdminPage({ params, searchParams }: Props) {
                   {q.edition !== "global" && <option value="global">global</option>}
                 </select>
               </div>
+              <div className="field">
+                <label htmlFor={`market-${q.id}`}>{t.ui.marketUrl}</label>
+                <input id={`market-${q.id}`} name="marketUrl" type="url" dir="ltr" placeholder="https://polymarket.com/event/..." />
+              </div>
               <button className="btn small" type="submit">
                 {t.admin.approve}
               </button>
@@ -169,7 +174,8 @@ export default async function AdminPage({ params, searchParams }: Props) {
                 name="reason"
                 aria-label={t.admin.rejectReason}
                 placeholder={t.admin.rejectReason}
-                style={{ flex: "1 1 220px", font: "inherit", padding: "0.35rem 0.6rem", border: "1px solid var(--line-strong)", borderRadius: 8 }}
+                className="input"
+                style={{ flex: "1 1 220px", width: "auto" }}
               />
               <button className="btn quiet small" type="submit">
                 {t.admin.reject}
@@ -209,7 +215,8 @@ export default async function AdminPage({ params, searchParams }: Props) {
                         dir="ltr"
                         aria-label={t.admin.proofUrl}
                         placeholder={t.admin.proofUrl}
-                        style={{ flex: "1 1 180px", font: "inherit", fontSize: "0.86rem", padding: "0.3rem 0.5rem", border: "1px solid var(--line-strong)", borderRadius: 8 }}
+                        className="input"
+                        style={{ flex: "1 1 180px", width: "auto", padding: "0.35rem 0.6rem", fontSize: "0.9rem" }}
                       />
                       <button className="btn small yes" name="verdict" value="yes" type="submit">
                         {t.admin.resolveYes}
@@ -221,6 +228,26 @@ export default async function AdminPage({ params, searchParams }: Props) {
                         {t.admin.annul}
                       </button>
                     </form>
+                    {q.status === "open" && (
+                      <form action={recordMarketPrice} style={{ display: "flex", gap: "0.4rem", justifyContent: "flex-end", marginTop: "0.5rem" }}>
+                        <input type="hidden" name="locale" value={locale} />
+                        <input type="hidden" name="id" value={q.id} />
+                        <input
+                          name="percent"
+                          type="number"
+                          min={1}
+                          max={99}
+                          dir="ltr"
+                          aria-label={t.ui.marketPrice}
+                          placeholder={t.ui.marketPrice}
+                          className="input"
+                          style={{ flex: "0 1 230px", width: "auto", padding: "0.35rem 0.6rem", fontSize: "0.9rem" }}
+                        />
+                        <button className="btn small quiet" type="submit">
+                          {t.ui.save}
+                        </button>
+                      </form>
+                    )}
                   </td>
                 </tr>
               ))}

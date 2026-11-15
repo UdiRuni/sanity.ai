@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Rail } from "@/components/Rail";
+import { AskIcon, DecideIcon, ForecastIcon } from "@/components/Icons";
 import { localeFrom } from "@/i18n";
 
 type Props = { params: Promise<{ locale: string }> };
@@ -12,31 +12,45 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function AboutPage({ params }: Props) {
   const { locale, t } = localeFrom((await params).locale);
-  // A fixed illustration of how to read the rail, not live data.
-  const example = [
-    { id: "a", name: "A", color: "#2a78d6", p: 0.31 },
-    { id: "b", name: "B", color: "#eb6834", p: 0.58 },
-    { id: "c", name: "C", color: "#1baf7a", p: 0.62 },
-    { id: "d", name: "D", color: "#6250d6", p: 0.84 },
-  ];
+  const icons = [<AskIcon key="a" />, <ForecastIcon key="f" />, <DecideIcon key="d" />];
 
   return (
-    <div style={{ maxWidth: "46rem" }}>
+    <>
       <h1>{t.about.title}</h1>
-      <div className="panel" style={{ marginTop: "1.75rem" }}>
-        <Rail t={t} size="lg" items={example} median={0.6} />
-      </div>
-      {t.about.sections.map((s) => (
-        <section key={s.h} style={{ marginTop: "2.25rem" }}>
-          <h2>{s.h}</h2>
-          <p style={{ marginTop: "0.6rem", color: "var(--ink-2)" }}>{s.p}</p>
+      <ol className="steps" style={{ listStyle: "none", padding: 0, marginTop: "1.75rem" }}>
+        {t.ui.steps.map((s, i) => (
+          <li className="step" key={s.h}>
+            <div className="step-icon">{icons[i]}</div>
+            <h3>
+              {i + 1}. {s.h}
+            </h3>
+            <p>{s.p}</p>
+          </li>
+        ))}
+      </ol>
+      <div style={{ maxWidth: "46rem" }}>
+        {t.about.sections.map((s) => (
+          <section key={s.h} style={{ marginTop: "2.25rem" }}>
+            <h2>{s.h}</h2>
+            <p style={{ marginTop: "0.6rem", color: "var(--ink-2)" }}>{s.p}</p>
+          </section>
+        ))}
+        <section style={{ marginTop: "2.25rem" }}>
+          <h2>{t.ui.marketFull}</h2>
+          <p style={{ marginTop: "0.6rem", color: "var(--ink-2)" }}>{t.ui.marketHint}</p>
         </section>
-      ))}
-      <p style={{ marginTop: "2.5rem" }}>
-        <Link className="btn" href={`/${locale}/suggest`}>
-          {t.home.heroCta}
-        </Link>
-      </p>
-    </div>
+      </div>
+      <section className="section">
+        <div className="cta-band">
+          <div>
+            <h2>{t.ui.ctaTitle}</h2>
+            <p>{t.ui.ctaBody}</p>
+          </div>
+          <Link className="btn big" href={`/${locale}/suggest`}>
+            {t.home.heroCta}
+          </Link>
+        </div>
+      </section>
+    </>
   );
 }

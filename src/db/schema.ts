@@ -48,6 +48,10 @@ export const questions = pgTable(
     title: jsonb("title").$type<Localized>().notNull(),
     criteria: jsonb("criteria").$type<Localized>().notNull(), // how it resolves
     sourceUrl: text("source_url"), // where the outcome will be published
+    // Optional link to the same question on a prediction market. When set, the
+    // market's price is tracked and scored like one more competitor.
+    marketUrl: text("market_url"),
+    marketSource: text("market_source"), // key in sanity.config.ts markets, or "manual"
     category: text("category").notNull().default("world"),
     suggestedBy: text("suggested_by"), // display name
     suggesterId: text("suggester_id"), // anonymous browser id, for rate limiting
@@ -97,6 +101,18 @@ export const forecasts = pgTable(
   ],
 );
 
+/** Market price snapshots. Append-only, like forecasts. */
+export const marketPrices = pgTable("market_prices", {
+  id: serial("id").primaryKey(),
+  questionId: integer("question_id")
+    .notNull()
+    .references(() => questions.id),
+  probability: doublePrecision("probability").notNull(), // price of YES, 0 to 1
+  source: text("source").notNull(),
+  mock: boolean("mock").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const votes = pgTable(
   "votes",
   {
@@ -112,3 +128,4 @@ export const votes = pgTable(
 export type Model = typeof models.$inferSelect;
 export type Question = typeof questions.$inferSelect;
 export type Forecast = typeof forecasts.$inferSelect;
+export type MarketPrice = typeof marketPrices.$inferSelect;

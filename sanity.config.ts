@@ -219,3 +219,36 @@ export const limits = {
   /** Most model calls in one scheduled run. */
   maxCallsPerRun: 200,
 };
+
+/**
+ * Prediction markets used as a baseline. When a question has a market link,
+ * the market's YES price is recorded on every scheduled run and scored on the
+ * leaderboard as one more competitor: "can any model beat the market?"
+ *
+ * `api` is the public price endpoint; {id} is taken from the market's URL.
+ * NOT VERIFIED: both endpoints are written from the markets' public API
+ * documentation and have not been called from this code. If a fetch fails the
+ * run carries on, and a price can always be typed in on the admin page.
+ */
+export const markets = {
+  polymarket: {
+    label: "Polymarket",
+    host: "polymarket.com",
+    api: "https://gamma-api.polymarket.com/markets?slug={id}",
+  },
+  kalshi: {
+    label: "Kalshi",
+    host: "kalshi.com",
+    api: "https://api.elections.kalshi.com/trade-api/v2/markets/{id}",
+  },
+} as const;
+
+export type MarketId = keyof typeof markets;
+
+export const marketSettings = {
+  /**
+   * Whether question pages link out to the market. Off by default: these are
+   * betting sites, and linking to them is a legal and brand decision.
+   */
+  showLink: false,
+};

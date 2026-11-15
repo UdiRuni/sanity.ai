@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDb, schema } from "@/db/client";
+import { parseMarketUrl } from "@/engine/markets";
 import { runForecastRound } from "@/engine/run";
 import { ADMIN_COOKIE, adminToken, hashPassword, isAdmin } from "@/lib/admin";
 import { categories, editionOf, isLocale, type Locale } from "@/lib/site";
@@ -134,6 +135,8 @@ export async function approveQuestion(form: FormData) {
   const title = String(form.get("title") ?? "").trim();
   const criteria = String(form.get("criteria") ?? "").trim();
   const edition = String(form.get("edition") ?? q.edition);
+  const marketUrl = String(form.get("marketUrl") ?? "").trim();
+  const marketRef = marketUrl ? parseMarketUrl(marketUrl) : null;
   const now = new Date();
   await db
     .update(schema.questions)
@@ -142,6 +145,9 @@ export async function approveQuestion(form: FormData) {
       title: title ? { ...q.title, [q.lang]: title } : q.title,
       criteria: criteria ? { ...q.criteria, [q.lang]: criteria } : q.criteria,
       edition: edition === "global" ? "global" : q.edition,
+      // An unrecognised market URL is kept, with prices entered by hand.
+      marketUrl: marketUrl || null,
+      marketSource: marketUrl ? (marketRef?.source ?? "manual") : null,
       openAt: now,
       // Forecasts freeze a day before the outcome is due.
       lockAt: new Date(Math.max(q.resolveBy.getTime() - DAY, now.getTime() + DAY)),
@@ -186,6 +192,25 @@ export async function resolveQuestion(form: FormData) {
         lockAt: q.lockAt && q.lockAt.getTime() < now.getTime() ? q.lockAt : now,
       })
       .where(eq(schema.questions.id, id));
+  }
+  revalidatePath(`/${locale}`, "layout");
+}
+
+/** Records the market's current YES price by hand, in percent. */
+export async function recordMarketPrice(form: FormData) {
+  await requireAdmin();
+  const locale = localeOf(form);
+  const id = Number(form.get("id"));
+  const percent = Number(String(form.get("percent") ?? "").replace("%", ""));
+  if (!Number.isInteger(id) || !Number.isFinite(percent) || percent < 1 || percent > 99) return;
+  const db = await getDb();
+  const [q] = await db.select().from(schema.questions).where(eq(schema.questions.id, id));
+  if (!q || q.status !== "open") return;
+  await db
+    .insert(schema.marketPrices)
+    .values({ questionId: id, probability: percent / 100, source: q.marketSource ?? "manual" });
+  if (!q.marketSource) {
+    await db.update(schema.questions).set({ marketSource: "manual" }).where(eq(schema.questions.id, id));
   }
   revalidatePath(`/${locale}`, "layout");
 }

@@ -18,6 +18,7 @@ This repository is phase 1 of the product spec: the public arena.
 | Admin: approve or edit, reject, resolve, annul, run a forecast round, spend against budget | Built |
 | Forecast engine: closed book and open book tracks, weekly open-book updates, monthly budget cap, cost logged per call | Built |
 | Scoring: time-weighted Brier, 0 to 100 score, uncertainty ranges, calibration, median "panel" | Built, with tests |
+| Prediction market as a competitor: market link per question, daily price snapshots, market row and "vs. market" column on the leaderboard | Built; the price fetchers are unverified |
 | Daily scheduled run (`/api/cron`) | Built |
 | Logo, favicon, social card | Built (`public/brand`, `src/app/icon.svg`) |
 
@@ -39,12 +40,17 @@ This repository is phase 1 of the product spec: the public arena.
 2. **Only the Anthropic adapter was checked against documentation.** None of
    the adapters in `src/engine/providers.ts` has been run with a live key.
    Run `npm run check:models` once your keys are set and expect small fixes.
-3. **Demo data.** With no `DATABASE_URL`, the app creates a local database and
+3. **Market prices.** The Polymarket and Kalshi endpoints in `sanity.config.ts`
+   are written from their public API docs and have not been called from this
+   code. If a fetch fails the run carries on, and a price can be typed in on
+   the admin page. Question pages do not link out to markets unless
+   `marketSettings.showLink` is turned on.
+4. **Demo data.** With no `DATABASE_URL`, the app creates a local database and
    fills it with invented questions and pseudo-random "forecasts". Demo
    questions have slugs starting with `demo-` and are labelled on the site, and
    a banner is shown while any demo forecast exists. Start production from an
    empty database.
-4. **The name.** "Sanity" is also the name of an established content platform
+5. **The name.** "Sanity" is also the name of an established content platform
    (Sanity.io). Check the trademark before launch. The brand name is set in
    one place: `src/lib/site.ts`.
 
@@ -114,7 +120,7 @@ suggestion -> admin approves -> open -> locked -> resolved (or annulled)
 
 ## Design
 
-White background, deep ink, one cobalt brand color. Headlines are set in Frank
-Ruhl Libre and text in Assistant; both cover Hebrew and Latin and are bundled
-with the app. The signature element is the probability rail: each model's
-forecast as a dot on a 0 to 100 line, so the disagreement is visible at a glance.
+White page, one blue, one typeface (Rubik, which covers Hebrew and Latin and is
+bundled with the app). A forecast is always shown the same way: a number and a
+bar. Questions are cards, and each model is a row you can open to read its
+reasoning. Every page ends with an invitation to suggest a question.

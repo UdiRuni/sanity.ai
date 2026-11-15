@@ -67,13 +67,21 @@ npm run dev
 2. Open http://localhost:3000/he/admin, sign in, and approve it.
 3. Press "Run a forecast round now". The question page now shows real forecasts.
 
-## 5. Go live
+## 5. Compare with a prediction market (optional)
+
+When you approve a question on the admin page, paste the link to the same
+question on Polymarket or Kalshi. The site then records the market's price on
+every scheduled run and scores it on the leaderboard next to the models. If the
+automatic fetch fails, type the current price into the box next to the question
+on the admin page.
+
+## 6. Go live
 
 1. Create a Postgres database (Supabase or Neon) and set `DATABASE_URL`.
 2. Set the same variables on your host, plus `CRON_SECRET` (any long random string).
 3. Deploy. `vercel.json` runs the forecast round every day at 03:00 UTC.
 
-## 6. Pull request reviews (optional)
+## 7. Pull request reviews (optional)
 
 The workflow in `.github/workflows/gemini-review.yml` posts a Gemini review on
 every pull request. In the GitHub repository settings, add a secret named
