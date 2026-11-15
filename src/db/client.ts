@@ -43,8 +43,11 @@ async function create(): Promise<Db> {
   await migrate(db, { migrationsFolder });
 
   // A fresh local database gets demo content so the site is not empty.
-  const { seedIfEmpty } = await import("./seed");
-  await seedIfEmpty(db);
+  // Set SEED_DEMO=false to start empty, e.g. when running with real API keys.
+  if (process.env.SEED_DEMO !== "false") {
+    const { seedIfEmpty } = await import("./seed");
+    await seedIfEmpty(db);
+  }
   await syncModels(db);
   return db;
 }

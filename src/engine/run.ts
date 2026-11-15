@@ -6,6 +6,7 @@ import { mockForecast } from "./mock";
 import { parseForecast } from "./parse";
 import { buildPrompt } from "./prompt";
 import { callProvider, costOf } from "./providers";
+import { limits } from "../../sanity.config";
 import { hasKey, type ProviderId } from "./registry";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -31,7 +32,7 @@ export async function spentThisMonth(now = new Date()): Promise<number> {
 }
 
 export function monthlyBudget(): number {
-  return Number(process.env.MONTHLY_BUDGET_USD ?? 50);
+  return Number(process.env.MONTHLY_BUDGET_USD || limits.defaultMonthlyBudgetUsd);
 }
 
 export type RunReport = {
@@ -61,7 +62,7 @@ export async function lockDueQuestions(now = new Date()): Promise<number> {
  */
 export async function runForecastRound(opts: { now?: Date; maxCalls?: number } = {}): Promise<RunReport> {
   const now = opts.now ?? new Date();
-  const maxCalls = opts.maxCalls ?? 200;
+  const maxCalls = opts.maxCalls ?? limits.maxCallsPerRun;
   const db = await getDb();
   await lockDueQuestions(now);
 

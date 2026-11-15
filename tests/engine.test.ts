@@ -3,7 +3,7 @@ import { mockForecast } from "@/engine/mock";
 import { parseForecast } from "@/engine/parse";
 import { buildPrompt } from "@/engine/prompt";
 import { costOf } from "@/engine/providers";
-import { modelRegistry } from "@/engine/registry";
+import { modelRegistry, providerOf } from "@/engine/registry";
 
 describe("parseForecast", () => {
   it("reads plain JSON", () => {
@@ -64,6 +64,22 @@ describe("mockForecast", () => {
     expect(a).toEqual(mockForecast(args));
     expect(a.probability).toBeGreaterThanOrEqual(0.01);
     expect(a.probability).toBeLessThanOrEqual(0.99);
+  });
+});
+
+describe("sanity.config", () => {
+  it("points every model at a configured provider", () => {
+    for (const m of modelRegistry) expect(providerOf(m.provider), m.id).toBeDefined();
+  });
+  it("only enables open book where the provider has a search tool", () => {
+    for (const m of modelRegistry) {
+      if (m.supportsOpenBook) expect(providerOf(m.provider).searchTool, m.id).toBeTruthy();
+    }
+  });
+  it("uses https endpoints without a trailing slash", () => {
+    for (const m of modelRegistry) {
+      expect(providerOf(m.provider).baseUrl).toMatch(/^https:\/\/[^ ]+[^/]$/);
+    }
   });
 });
 

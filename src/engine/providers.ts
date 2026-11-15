@@ -1,15 +1,16 @@
 import type { Track } from "@/lib/site";
-import type { ModelSpec } from "./registry";
+import { limits, type ProviderConfig } from "../../sanity.config";
+import { apiKey, providerOf, type ModelSpec } from "./registry";
 
 /**
- * One adapter per provider. Each takes the shared prompt and returns raw text
- * plus usage, so cost can be logged for every call.
+ * Talks to model providers. There is one function per API style, and every
+ * URL, version, tool name and limit comes from sanity.config.ts, so pointing
+ * the site at a different endpoint or tool version is a config change.
  *
- * STATUS: the Anthropic request shape was checked against the official docs
- * (web_search_20250305, usage.server_tool_use.web_search_requests). The OpenAI,
- * Google, xAI and OpenRouter shapes are written from their public API
- * conventions and have NOT been run against live keys. Expect to adjust
- * field names on first contact.
+ * STATUS: the "anthropic-messages" request shape was checked against the
+ * official docs. The "responses", "gemini" and "chat-completions" shapes are
+ * written from the providers' public API conventions and have NOT been run
+ * with live keys. `npm run check:models` exercises each one.
  */
 
 export type ProviderResult = {
@@ -22,17 +23,20 @@ export type ProviderResult = {
 
 type Prompt = { system: string; user: string };
 
-const MAX_SEARCHES = 5;
-const MAX_OUTPUT_TOKENS = 4000;
-const TIMEOUT_MS = 180_000;
-
 async function postJson(url: string, headers: Record<string, string>, body: unknown) {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json", ...headers },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...headers },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(limits.timeoutMs),
+    });
+  } catch (err) {
+    // Node reports network problems as a bare "fetch failed"; the cause has the reason.
+    const cause = err instanceof Error && err.cause instanceof Error ? `: ${err.cause.message}` : "";
+    throw new Error(`Could not reach ${new URL(url).host}${cause || `: ${String(err)}`}`);
+  }
   const text = await res.text();
   if (!res.ok) throw new Error(`${url} responded ${res.status}: ${text.slice(0, 400)}`);
   return JSON.parse(text);
@@ -43,17 +47,26 @@ function dedupe(sources: { title: string; url: string }[]) {
   return sources.filter((s) => s.url && !seen.has(s.url) && seen.add(s.url)).slice(0, 8);
 }
 
-/* ---------- Anthropic ---------- */
+/** Search is on only in the open-book track and only if the provider has a tool. */
+function searchToolFor(cfg: ProviderConfig, track: Track): string | null {
+  return track === "open" ? cfg.searchTool : null;
+}
 
-async function anthropic(model: ModelSpec, prompt: Prompt, track: Track): Promise<ProviderResult> {
-  const headers = {
-    "x-api-key": process.env.ANTHROPIC_API_KEY!,
-    "anthropic-version": "2023-06-01",
-  };
-  const tools =
-    track === "open"
-      ? [{ type: "web_search_20250305", name: "web_search", max_uses: MAX_SEARCHES }]
-      : undefined;
+/* ---------- anthropic-messages ---------- */
+
+async function anthropicMessages(
+  cfg: ProviderConfig,
+  key: string,
+  model: ModelSpec,
+  prompt: Prompt,
+  track: Track,
+): Promise<ProviderResult> {
+  const headers: Record<string, string> = { "x-api-key": key };
+  if (cfg.apiVersion) headers["anthropic-version"] = cfg.apiVersion;
+  const tool = searchToolFor(cfg, track);
+  const tools = tool
+    ? [{ type: tool, name: "web_search", max_uses: limits.maxSearchesPerForecast }]
+    : undefined;
 
   type Block = {
     type: string;
@@ -69,9 +82,9 @@ async function anthropic(model: ModelSpec, prompt: Prompt, track: Track): Promis
 
   // Long server-side tool turns can return stop_reason "pause_turn"; resend to continue.
   for (let turn = 0; turn < 3; turn++) {
-    const data = await postJson("https://api.anthropic.com/v1/messages", headers, {
+    const data = await postJson(`${cfg.baseUrl}/messages`, headers, {
       model: model.apiModel,
-      max_tokens: MAX_OUTPUT_TOKENS,
+      max_tokens: limits.maxOutputTokens,
       system: prompt.system,
       messages,
       ...(tools ? { tools } : {}),
@@ -95,24 +108,25 @@ async function anthropic(model: ModelSpec, prompt: Prompt, track: Track): Promis
   return { text, tokensIn, tokensOut, searches, sources: dedupe(sources) };
 }
 
-/* ---------- OpenAI and xAI (Responses API shape) ---------- */
+/* ---------- responses (OpenAI, xAI and compatible) ---------- */
 
 async function responsesApi(
-  baseUrl: string,
-  apiKey: string,
+  cfg: ProviderConfig,
+  key: string,
   model: ModelSpec,
   prompt: Prompt,
   track: Track,
 ): Promise<ProviderResult> {
+  const tool = searchToolFor(cfg, track);
   const data = await postJson(
-    `${baseUrl}/responses`,
-    { authorization: `Bearer ${apiKey}` },
+    `${cfg.baseUrl}/responses`,
+    { authorization: `Bearer ${key}` },
     {
       model: model.apiModel,
       instructions: prompt.system,
       input: prompt.user,
-      max_output_tokens: MAX_OUTPUT_TOKENS,
-      ...(track === "open" ? { tools: [{ type: "web_search" }], max_tool_calls: MAX_SEARCHES } : {}),
+      max_output_tokens: limits.maxOutputTokens,
+      ...(tool ? { tools: [{ type: tool }], max_tool_calls: limits.maxSearchesPerForecast } : {}),
     },
   );
 
@@ -143,17 +157,24 @@ async function responsesApi(
   };
 }
 
-/* ---------- Google Gemini ---------- */
+/* ---------- gemini ---------- */
 
-async function google(model: ModelSpec, prompt: Prompt, track: Track): Promise<ProviderResult> {
+async function gemini(
+  cfg: ProviderConfig,
+  key: string,
+  model: ModelSpec,
+  prompt: Prompt,
+  track: Track,
+): Promise<ProviderResult> {
+  const tool = searchToolFor(cfg, track);
   const data = await postJson(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model.apiModel}:generateContent`,
-    { "x-goog-api-key": process.env.GEMINI_API_KEY! },
+    `${cfg.baseUrl}/models/${model.apiModel}:generateContent`,
+    { "x-goog-api-key": key },
     {
       systemInstruction: { parts: [{ text: prompt.system }] },
       contents: [{ role: "user", parts: [{ text: prompt.user }] }],
-      generationConfig: { maxOutputTokens: MAX_OUTPUT_TOKENS },
-      ...(track === "open" ? { tools: [{ google_search: {} }] } : {}),
+      generationConfig: { maxOutputTokens: limits.maxOutputTokens },
+      ...(tool ? { tools: [{ [tool]: {} }] } : {}),
     },
   );
   const candidate = data.candidates?.[0];
@@ -175,15 +196,20 @@ async function google(model: ModelSpec, prompt: Prompt, track: Track): Promise<P
   };
 }
 
-/* ---------- OpenRouter (chat completions, closed book only) ---------- */
+/* ---------- chat-completions (closed book only) ---------- */
 
-async function openrouter(model: ModelSpec, prompt: Prompt): Promise<ProviderResult> {
+async function chatCompletions(
+  cfg: ProviderConfig,
+  key: string,
+  model: ModelSpec,
+  prompt: Prompt,
+): Promise<ProviderResult> {
   const data = await postJson(
-    "https://openrouter.ai/api/v1/chat/completions",
-    { authorization: `Bearer ${process.env.OPENROUTER_API_KEY!}` },
+    `${cfg.baseUrl}/chat/completions`,
+    { authorization: `Bearer ${key}` },
     {
       model: model.apiModel,
-      max_tokens: MAX_OUTPUT_TOKENS,
+      max_tokens: limits.maxOutputTokens,
       messages: [
         { role: "system", content: prompt.system },
         { role: "user", content: prompt.user },
@@ -204,21 +230,23 @@ export async function callProvider(
   prompt: Prompt,
   track: Track,
 ): Promise<ProviderResult> {
-  switch (model.provider) {
-    case "anthropic":
-      return anthropic(model, prompt, track);
-    case "openai":
-      return responsesApi("https://api.openai.com/v1", process.env.OPENAI_API_KEY!, model, prompt, track);
-    case "xai":
-      return responsesApi("https://api.x.ai/v1", process.env.XAI_API_KEY!, model, prompt, track);
-    case "google":
-      return google(model, prompt, track);
-    case "openrouter":
-      return openrouter(model, prompt);
+  const cfg = providerOf(model.provider);
+  const key = apiKey(model.provider);
+  if (!key) throw new Error(`${cfg.keyEnv} is not set`);
+
+  switch (cfg.api) {
+    case "anthropic-messages":
+      return anthropicMessages(cfg, key, model, prompt, track);
+    case "responses":
+      return responsesApi(cfg, key, model, prompt, track);
+    case "gemini":
+      return gemini(cfg, key, model, prompt, track);
+    case "chat-completions":
+      return chatCompletions(cfg, key, model, prompt);
   }
 }
 
-/** USD cost of one call, from the registry prices. */
+/** USD cost of one call, from the configured prices. */
 export function costOf(
   model: Pick<ModelSpec, "priceInPerMTok" | "priceOutPerMTok" | "searchPricePer1k">,
   usage: Pick<ProviderResult, "tokensIn" | "tokensOut" | "searches">,
