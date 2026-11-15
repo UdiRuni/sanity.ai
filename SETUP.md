@@ -77,7 +77,8 @@ npm run dev
 
 The workflow in `.github/workflows/gemini-review.yml` posts a Gemini review on
 every pull request. In the GitHub repository settings, add a secret named
-`GEMINI_API_KEY`. To use a different model, add a repository variable named
+`GEMINI_API_KEY`. The default model is `gemini-3.1-pro-preview`; to use a
+different one, add a repository variable named
 `GEMINI_REVIEW_MODEL`.
 
 ## Changing the lineup later

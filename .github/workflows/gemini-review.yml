@@ -28,7 +28,7 @@ jobs:
       # Values reach the scripts as environment variables, never by pasting
       # ${{ }} expressions into shell code.
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      GEMINI_MODEL: ${{ vars.GEMINI_REVIEW_MODEL || 'gemini-2.5-pro' }}
+      GEMINI_MODEL: ${{ vars.GEMINI_REVIEW_MODEL || 'gemini-3.1-pro-preview' }}
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
