@@ -56,15 +56,12 @@ export default async function ModelPage({ params }: Props) {
           {t.model.since} {formatDate(model.joinedAt, locale)}
         </span>
       </div>
-      <h1 style={{ marginTop: "0.8rem", display: "flex", alignItems: "center", gap: "0.8rem" }}>
-        <span className="swatch" style={{ background: model.color, width: 22, height: 22 }} />
-        {model.name}
-      </h1>
+      <h1 style={{ marginTop: "0.8rem" }}>{model.name}</h1>
 
-      <div style={{ display: "flex", gap: "2.5rem", flexWrap: "wrap", marginTop: "1.75rem" }}>
+      <div className="grid" style={{ marginTop: "1.75rem", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
         {profile.rows.map(({ track, row }) => (
-          <div key={track}>
-            <div className="figure big">{row ? row.score.toFixed(1) : "?"}</div>
+          <div key={track} className="panel soft">
+            <div className="figure" dir="ltr" style={{ textAlign: "start" }}>{row ? row.score.toFixed(1) : "?"}</div>
             <div className="figure-label">
               {t.board.score}, {t.track[track]}
               {row ? ` (${row.resolved} ${t.board.resolved})` : ""}
@@ -72,8 +69,8 @@ export default async function ModelPage({ params }: Props) {
           </div>
         ))}
         {profile.rank > 0 && (
-          <div>
-            <div className="figure big">{profile.rank}</div>
+          <div className="panel soft">
+            <div className="figure">{profile.rank}</div>
             <div className="figure-label">
               {t.board.rank}, {t.track.closed}
             </div>
@@ -92,7 +89,7 @@ export default async function ModelPage({ params }: Props) {
           </p>
         ) : (
           <div style={{ display: "flex", gap: "2.5rem", flexWrap: "wrap", alignItems: "center", marginTop: "1.25rem" }}>
-            <CalibrationChart bins={profile.calibration} color={model.color} t={t} />
+            <CalibrationChart bins={profile.calibration} color="#2f5bea" t={t} />
             <div className="table-wrap" style={{ flex: "1 1 260px" }}>
               <table className="data">
                 <thead>

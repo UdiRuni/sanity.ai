@@ -1,8 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 196 48" role="img" aria-label="sanity">
-  <rect y="4" width="40" height="40" rx="10" fill="#2343d8"/>
-  <path d="M7.500 24h25" stroke="#fff" stroke-width="3.750" stroke-linecap="round"/>
-  <path d="M16.250 17.100v13.800" stroke="#fff" stroke-opacity=".5" stroke-width="2.500" stroke-linecap="round"/>
-  <circle cx="25.600" cy="24" r="7" fill="#fff"/>
-  <circle cx="25.600" cy="24" r="3" fill="#2343d8"/>
-  <text x="52" y="36" font-family="'Frank Ruhl Libre', Georgia, 'Times New Roman', serif" font-size="36" font-weight="600" letter-spacing="-0.7" fill="#10182b">sanity</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 190 48" role="img" aria-label="sanity">
+  <rect y="4" width="40" height="40" rx="11" fill="#2f5bea"/>
+  <path d="M11.250 24.750l5.750 5.750L28.750 18.250" fill="none" stroke="#fff" stroke-width="4.250" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="52" y="35" font-family="Rubik, Arial, Helvetica, sans-serif" font-size="34" font-weight="700" letter-spacing="-1" fill="#131a2b">sanity</text>
 </svg>

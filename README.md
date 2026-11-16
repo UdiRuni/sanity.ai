@@ -18,6 +18,7 @@ This repository is phase 1 of the product spec: the public arena.
 | Admin: approve or edit, reject, resolve, annul, run a forecast round, spend against budget | Built |
 | Forecast engine: closed book and open book tracks, weekly open-book updates, monthly budget cap, cost logged per call | Built |
 | Scoring: time-weighted Brier, 0 to 100 score, uncertainty ranges, calibration, median "panel" | Built, with tests |
+| Prediction market as a competitor: market link per question, daily price snapshots, market row and "vs. market" column on the leaderboard | Built; the price fetchers are unverified |
 | Daily scheduled run (`/api/cron`) | Built |
 | Logo, favicon, social card | Built (`public/brand`, `src/app/icon.svg`) |
 
@@ -32,21 +33,28 @@ This repository is phase 1 of the product spec: the public arena.
 
 ## Read this before going live
 
-1. **Model ids and prices are unverified.** `src/engine/registry.ts` lists the
-   lineup. The Anthropic entries follow the official docs. The OpenAI, Google,
+1. **Model ids and prices are unverified.** `sanity.config.ts` lists the
+   providers and the lineup. The Anthropic entries follow the official docs. The OpenAI, Google,
    xAI and OpenRouter `apiModel` strings and all prices came from pricing
    roundups and must be checked against each provider.
 2. **Only the Anthropic adapter was checked against documentation.** None of
    the adapters in `src/engine/providers.ts` has been run with a live key.
-   Expect small fixes on first contact.
-3. **Demo data.** With no `DATABASE_URL`, the app creates a local database and
+   Run `npm run check:models` once your keys are set and expect small fixes.
+3. **Market prices.** The Polymarket and Kalshi endpoints in `sanity.config.ts`
+   are written from their public API docs and have not been called from this
+   code. If a fetch fails the run carries on, and a price can be typed in on
+   the admin page. Question pages do not link out to markets unless
+   `marketSettings.showLink` is turned on.
+4. **Demo data.** With no `DATABASE_URL`, the app creates a local database and
    fills it with invented questions and pseudo-random "forecasts". Demo
    questions have slugs starting with `demo-` and are labelled on the site, and
    a banner is shown while any demo forecast exists. Start production from an
    empty database.
-4. **The name.** "Sanity" is also the name of an established content platform
+5. **The name.** "Sanity" is also the name of an established content platform
    (Sanity.io). Check the trademark before launch. The brand name is set in
    one place: `src/lib/site.ts`.
+
+For connecting the models step by step, see [SETUP.md](SETUP.md).
 
 ## Run locally
 
@@ -77,16 +85,13 @@ All settings are environment variables, documented in `.env.example`.
 | `ADMIN_PASSWORD` | Enables the admin page. |
 | `CRON_SECRET` | Protects `/api/cron`. |
 | `MONTHLY_BUDGET_USD` | Hard cap on model spending per month. Default 50. |
-| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`, `OPENROUTER_API_KEY` | One per provider. A model with no key writes labelled demo forecasts instead of calling the provider. |
+| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`, `OPENROUTER_API_KEY` | One per provider. On a real database a model with no key sits out. In local demo mode it writes labelled demo forecasts. |
 
 ## Deploy
 
-1. Create a Postgres database (Supabase, Neon or similar) and set `DATABASE_URL`.
-   Migrations in `./drizzle` are applied automatically on first request.
-2. Set the provider keys, `ADMIN_PASSWORD` and `CRON_SECRET`. Models listed in
-   `src/engine/registry.ts` are added to the database automatically.
-3. Deploy to a Node host. `vercel.json` schedules `/api/cron` daily at 03:00 UTC.
-   PGlite is single-process and is not suitable for serverless hosting.
+Free to start: Vercel (Hobby) for the site, Neon (Free) for the database and
+GitHub Actions for the schedule. Step by step in [SETUP.md](SETUP.md#6-go-live).
+Vercel's Hobby plan is for non-commercial use, so move to Pro before charging.
 
 ## How it works
 
@@ -98,8 +103,10 @@ suggestion -> admin approves -> open -> locked -> resolved (or annulled)
                  open book:   one forecast per week until the lock
 ```
 
+- `sanity.config.ts`: providers, endpoints, models, prices and limits, in one file.
 - `src/engine/prompt.ts`: the one prompt every model receives.
-- `src/engine/providers.ts`: one adapter per provider, returning text and usage.
+- `src/engine/providers.ts`: one adapter per API style, returning text and usage.
+- `scripts/check-models.ts`: tests every model connection (`npm run check:models`).
 - `src/engine/parse.ts`: turns a model reply into a probability in [0.01, 0.99].
 - `src/engine/run.ts`: the round runner, with the budget guard.
 - `src/lib/scoring.ts`: Brier, the 0 to 100 score, ranges and calibration.
@@ -110,7 +117,7 @@ suggestion -> admin approves -> open -> locked -> resolved (or annulled)
 
 ## Design
 
-White background, deep ink, one cobalt brand color. Headlines are set in Frank
-Ruhl Libre and text in Assistant; both cover Hebrew and Latin and are bundled
-with the app. The signature element is the probability rail: each model's
-forecast as a dot on a 0 to 100 line, so the disagreement is visible at a glance.
+White page, one blue, one typeface (Rubik, which covers Hebrew and Latin and is
+bundled with the app). A forecast is always shown the same way: a number and a
+bar. Questions are cards, and each model is a row you can open to read its
+reasoning. Every page ends with an invitation to suggest a question.

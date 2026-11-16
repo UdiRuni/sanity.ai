@@ -2,10 +2,12 @@ import "server-only";
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db/client";
 import type { Track } from "@/lib/site";
+import { fetchMarketPrice, parseMarketUrl } from "./markets";
 import { mockForecast } from "./mock";
 import { parseForecast } from "./parse";
 import { buildPrompt } from "./prompt";
 import { callProvider, costOf } from "./providers";
+import { limits } from "../../sanity.config";
 import { hasKey, type ProviderId } from "./registry";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -30,8 +32,13 @@ export async function spentThisMonth(now = new Date()): Promise<number> {
   return Number(row?.total ?? 0);
 }
 
+/** Whether a model with no API key may write a labelled demo forecast. */
+export function mockAllowed(): boolean {
+  return !process.env.DATABASE_URL || process.env.MOCK_FORECASTS === "true";
+}
+
 export function monthlyBudget(): number {
-  return Number(process.env.MONTHLY_BUDGET_USD ?? 50);
+  return Number(process.env.MONTHLY_BUDGET_USD || limits.defaultMonthlyBudgetUsd);
 }
 
 export type RunReport = {
@@ -40,7 +47,10 @@ export type RunReport = {
   failed: { model: string; question: string; error: string }[];
   costUsd: number;
   stoppedForBudget: boolean;
+  /** True when the time or call limit was reached with forecasts still missing. Call again. */
+  moreWork: boolean;
   mock: number;
+  marketPrices: number;
 };
 
 /** Moves questions whose lock time has passed from open to locked. */
@@ -61,7 +71,7 @@ export async function lockDueQuestions(now = new Date()): Promise<number> {
  */
 export async function runForecastRound(opts: { now?: Date; maxCalls?: number } = {}): Promise<RunReport> {
   const now = opts.now ?? new Date();
-  const maxCalls = opts.maxCalls ?? 200;
+  const maxCalls = opts.maxCalls ?? limits.maxCallsPerRun;
   const db = await getDb();
   await lockDueQuestions(now);
 
@@ -71,10 +81,44 @@ export async function runForecastRound(opts: { now?: Date; maxCalls?: number } =
     failed: [],
     costUsd: 0,
     stoppedForBudget: false,
+    moreWork: false,
     mock: 0,
+    marketPrices: 0,
   };
+  const started = Date.now();
+  const outOfTime = () => Date.now() - started > limits.maxRunSeconds * 1000;
 
   const open = await db.select().from(schema.questions).where(eq(schema.questions.status, "open"));
+
+  // Record today's market price for every open question that has a market link.
+  for (const q of open) {
+    const ref = q.marketUrl ? parseMarketUrl(q.marketUrl) : null;
+    if (!ref) continue;
+    // One market price a day per question is enough, however often the run is called.
+    const [recent] = await db
+      .select({ id: schema.marketPrices.id })
+      .from(schema.marketPrices)
+      .where(
+        and(
+          eq(schema.marketPrices.questionId, q.id),
+          gte(schema.marketPrices.createdAt, new Date(now.getTime() - 20 * 60 * 60 * 1000)),
+        ),
+      )
+      .limit(1);
+    if (recent) continue;
+    try {
+      const probability = await fetchMarketPrice(ref);
+      await db.insert(schema.marketPrices).values({ questionId: q.id, probability, source: ref.source, createdAt: now });
+      report.marketPrices++;
+    } catch (err) {
+      report.failed.push({
+        model: `market:${ref.source}`,
+        question: q.slug,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   const models = await db.select().from(schema.models).where(eq(schema.models.active, true));
   let spent = await spentThisMonth(now);
   const budget = monthlyBudget();
@@ -103,7 +147,16 @@ export async function runForecastRound(opts: { now?: Date; maxCalls?: number } =
           report.skipped++;
           continue;
         }
-        if (calls >= maxCalls) return report;
+        // Demo numbers are only for the local demo database. On a real database
+        // a model without an API key simply does not take part.
+        if (!hasKey(model.provider as ProviderId) && !mockAllowed()) {
+          report.skipped++;
+          continue;
+        }
+        if (calls >= maxCalls || outOfTime()) {
+          report.moreWork = true;
+          return report;
+        }
         if (spent >= budget) {
           report.stoppedForBudget = true;
           return report;

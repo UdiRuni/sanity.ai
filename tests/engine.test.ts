@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { extractKalshiPrice, extractPolymarketPrice, parseMarketUrl } from "@/engine/markets";
 import { mockForecast } from "@/engine/mock";
 import { parseForecast } from "@/engine/parse";
 import { buildPrompt } from "@/engine/prompt";
 import { costOf } from "@/engine/providers";
-import { modelRegistry } from "@/engine/registry";
+import { modelRegistry, providerOf } from "@/engine/registry";
 
 describe("parseForecast", () => {
   it("reads plain JSON", () => {
@@ -67,9 +68,58 @@ describe("mockForecast", () => {
   });
 });
 
+describe("sanity.config", () => {
+  it("points every model at a configured provider", () => {
+    for (const m of modelRegistry) expect(providerOf(m.provider), m.id).toBeDefined();
+  });
+  it("only enables open book where the provider has a search tool", () => {
+    for (const m of modelRegistry) {
+      if (m.supportsOpenBook) expect(providerOf(m.provider).searchTool, m.id).toBeTruthy();
+    }
+  });
+  it("uses https endpoints without a trailing slash", () => {
+    for (const m of modelRegistry) {
+      expect(providerOf(m.provider).baseUrl).toMatch(/^https:\/\/[^ ]+[^/]$/);
+    }
+  });
+});
+
 describe("modelRegistry", () => {
   it("has unique ids and colors", () => {
     expect(new Set(modelRegistry.map((m) => m.id)).size).toBe(modelRegistry.length);
     expect(new Set(modelRegistry.map((m) => m.color)).size).toBe(modelRegistry.length);
+  });
+});
+
+describe("markets", () => {
+  it("recognises Polymarket and Kalshi URLs", () => {
+    expect(parseMarketUrl("https://polymarket.com/event/fed-decision/Will-The-Fed-Cut?tid=1")).toEqual({
+      source: "polymarket",
+      id: "will-the-fed-cut",
+    });
+    expect(parseMarketUrl("https://www.kalshi.com/markets/kxfed/fed-meeting/kxfed-26dec")).toEqual({
+      source: "kalshi",
+      id: "KXFED-26DEC",
+    });
+  });
+  it("returns null for other sites and for junk", () => {
+    expect(parseMarketUrl("https://example.com/market/x")).toBeNull();
+    expect(parseMarketUrl("not a url")).toBeNull();
+    expect(parseMarketUrl("https://polymarket.com/")).toBeNull();
+  });
+  it("reads the YES price from a Polymarket response", () => {
+    const data = [{ outcomes: '["Yes","No"]', outcomePrices: '["0.165","0.835"]' }];
+    expect(extractPolymarketPrice(data)).toBe(0.165);
+    const flipped = [{ outcomes: '["No","Yes"]', outcomePrices: '["0.8","0.2"]' }];
+    expect(extractPolymarketPrice(flipped)).toBe(0.2);
+    expect(extractPolymarketPrice([])).toBeNull();
+    expect(extractPolymarketPrice([{ outcomes: "oops", outcomePrices: "oops" }])).toBeNull();
+  });
+  it("reads the YES price from a Kalshi response, in cents or dollars", () => {
+    expect(extractKalshiPrice({ market: { yes_bid: 16, yes_ask: 18 } })).toBeCloseTo(0.17);
+    expect(extractKalshiPrice({ market: { yes_bid_dollars: "0.16", yes_ask_dollars: "0.18" } })).toBeCloseTo(0.17);
+    expect(extractKalshiPrice({ market: { last_price: 71 } })).toBeCloseTo(0.71);
+    expect(extractKalshiPrice({ market: {} })).toBeNull();
+    expect(extractKalshiPrice(null)).toBeNull();
   });
 });

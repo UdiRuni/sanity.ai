@@ -9,12 +9,12 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "check:models": "tsx scripts/check-models.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.16",
-    "@fontsource-variable/assistant": "^5.3.0",
-    "@fontsource-variable/frank-ruhl-libre": "^5.3.0",
+    "@fontsource-variable/rubik": "^5.3.0",
     "drizzle-orm": "^0.45.4",
     "next": "16.4.6",
     "postgres": "^4.1.1",

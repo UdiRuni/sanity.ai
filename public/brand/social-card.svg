@@ -1,25 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="sanity: AI models forecast the future. We keep score.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="sanity: Ask AI what will happen. Then see if it was right.">
   <rect width="1200" height="630" fill="#fff"/>
-  <rect x="80" y="80" width="72" height="72" rx="18" fill="#2343d8"/>
-  <path d="M96 118.500h40" stroke="#fff" stroke-width="5.400" stroke-linecap="round"/>
-  <path d="M116 109.500v18" stroke="#fff" stroke-opacity=".55" stroke-width="3.600" stroke-linecap="round"/>
-  <circle cx="128.400" cy="118.500" r="9.200" fill="#fff"/>
-  <circle cx="128.400" cy="118.500" r="3.800" fill="#2343d8"/>
-  <text x="172" y="136" font-family="'Frank Ruhl Libre', Georgia, serif" font-size="60" font-weight="600" letter-spacing="-1.200" fill="#10182b">sanity</text>
-  <text x="80" y="290" font-family="'Frank Ruhl Libre', Georgia, serif" font-size="76" font-weight="500" letter-spacing="-1.500" fill="#10182b">AI models forecast the future.</text>
-  <text x="80" y="382" font-family="'Frank Ruhl Libre', Georgia, serif" font-size="76" font-weight="500" letter-spacing="-1.500" fill="#10182b">We keep score.</text>
-  <path d="M80 520h1040" stroke="#c9d0dc" stroke-width="4" stroke-linecap="round"/>
-  <path d="M80 506v28M600 506v28M1120 506v28" stroke="#c9d0dc" stroke-width="2"/>
-  <path d="M742 440v100" stroke="#10182b" stroke-width="4" stroke-linecap="round"/>
-  <g stroke="#fff" stroke-width="5">
-    <circle cx="402" cy="500" r="18" fill="#e34948"/>
-    <circle cx="566" cy="500" r="18" fill="#eda100"/>
-    <circle cx="690" cy="500" r="18" fill="#2a78d6"/>
-    <circle cx="742" cy="462" r="18" fill="#eb6834"/>
-    <circle cx="776" cy="500" r="18" fill="#1baf7a"/>
-    <circle cx="858" cy="500" r="18" fill="#6250d6"/>
-    <circle cx="968" cy="500" r="18" fill="#008300"/>
-  </g>
-  <text x="80" y="572" font-family="Assistant, Arial, sans-serif" font-size="26" fill="#6b7689">No 0%</text>
-  <text x="1120" y="572" text-anchor="end" font-family="Assistant, Arial, sans-serif" font-size="26" fill="#6b7689">100% Yes</text>
+  <rect x="80" y="72" width="76" height="76" rx="21" fill="#2f5bea"/>
+  <path d="M101.400 111.400l10.900 10.900 22.300-23.300" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="176" y="132" font-family="Rubik, Arial, Helvetica, sans-serif" font-size="62" font-weight="700" letter-spacing="-2" fill="#131a2b">sanity</text>
+  <text x="80" y="290" font-family="Rubik, Arial, Helvetica, sans-serif" font-size="74" font-weight="700" letter-spacing="-2" fill="#131a2b">Ask AI what will happen.</text>
+  <text x="80" y="380" font-family="Rubik, Arial, Helvetica, sans-serif" font-size="74" font-weight="700" letter-spacing="-2" fill="#131a2b">Then see if it was right.</text>
+  <rect x="80" y="470" width="1040" height="36" rx="18" fill="#e9edf5"/>
+  <rect x="80" y="470" width="666" height="36" rx="18" fill="#2f5bea"/>
+  <text x="80" y="560" font-family="Rubik, Arial, Helvetica, sans-serif" font-size="34" font-weight="700" fill="#131a2b">64%</text>
+  <text x="170" y="560" font-family="Rubik, Arial, Helvetica, sans-serif" font-size="30" fill="#69748a">chance it happens, according to the models</text>
 </svg>

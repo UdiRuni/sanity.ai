@@ -32,10 +32,10 @@ export default async function SuggestPage({ params, searchParams }: Props) {
   const minDate = new Date(now().getTime() + 4 * DAY_MS).toISOString().slice(0, 10);
 
   return (
-    <div style={{ display: "grid", gap: "3rem", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))" }}>
+    <div style={{ display: "grid", gap: "2.5rem", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))", alignItems: "start" }}>
       <section>
         <h1>{t.suggest.title}</h1>
-        <p className="lead" style={{ marginBlock: "0.8rem 1.75rem" }}>
+        <p className="lead" style={{ marginBlock: "0.8rem 1.5rem" }}>
           {t.suggest.lead}
         </p>
         {ok && (
@@ -48,12 +48,11 @@ export default async function SuggestPage({ params, searchParams }: Props) {
             {errorText}
           </p>
         )}
-        <form action={suggestQuestion}>
+        <form action={suggestQuestion} className="panel" style={{ padding: "1.5rem" }}>
           <input type="hidden" name="locale" value={locale} />
           <div className="field">
             <label htmlFor="title">{t.suggest.question}</label>
-            <input id="title" name="title" required minLength={15} maxLength={200} />
-            <span className="hint">{t.suggest.questionHint}</span>
+            <input id="title" name="title" required minLength={15} maxLength={200} placeholder={t.ui.examples[0]} />
           </div>
           <div className="field">
             <label htmlFor="criteria">{t.suggest.criteria}</label>
@@ -84,62 +83,73 @@ export default async function SuggestPage({ params, searchParams }: Props) {
             <label htmlFor="name">{t.suggest.name}</label>
             <input id="name" name="name" maxLength={40} autoComplete="nickname" />
           </div>
-          <button className="btn" type="submit">
+          <button className="btn big" type="submit">
             {t.suggest.submit}
           </button>
         </form>
       </section>
 
-      <section>
-        <h2>{t.suggest.queueTitle}</h2>
-        <p className="muted" style={{ marginBlock: "0.5rem 1rem" }}>
-          {t.suggest.queueLead}
-        </p>
-        {pending.length === 0 ? (
-          <p className="muted">{t.suggest.queueEmpty}</p>
-        ) : (
-          <div style={{ borderTop: "1px solid var(--line)" }}>
-            {pending.map((q) => (
-              <div
-                key={q.id}
-                style={{
-                  display: "flex",
-                  gap: "1rem",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "0.9rem 0",
-                  borderBottom: "1px solid var(--line)",
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 600 }}>{pick(q.title, locale, q.lang)}</div>
-                  <div className="meta" style={{ marginTop: "0.25rem" }}>
-                    <span>{t.category[q.category as keyof typeof t.category] ?? q.category}</span>
-                    <span>
-                      {t.questions.resolves} {formatDate(q.resolveBy, locale)}
-                    </span>
-                    {q.suggestedBy && (
-                      <span>
-                        {t.questions.suggestedBy} {q.suggestedBy}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <form action={voteForQuestion} style={{ textAlign: "center", flex: "none" }}>
-                  <input type="hidden" name="locale" value={locale} />
-                  <input type="hidden" name="questionId" value={q.id} />
-                  <button className="btn quiet small" type="submit" aria-label={`${t.suggest.vote}: ${pick(q.title, locale, q.lang)}`}>
-                    {t.suggest.vote}
-                  </button>
-                  <div className="small muted" style={{ marginTop: "0.2rem" }}>
-                    {q.votes} {t.suggest.votes}
-                  </div>
-                </form>
-              </div>
+      <div className="stack" style={{ gap: "2rem" }}>
+        <section className="panel soft">
+          <h2 style={{ fontSize: "1.2rem" }}>{t.ui.tipsTitle}</h2>
+          <ul className="checks" style={{ listStyle: "none", padding: 0, marginTop: "0.8rem" }}>
+            {t.ui.tips.map((tip) => (
+              <li key={tip}>{tip}</li>
             ))}
-          </div>
-        )}
-      </section>
+          </ul>
+          <h3 style={{ marginTop: "1.2rem", fontSize: "1rem" }}>{t.ui.examplesTitle}</h3>
+          <ul className="prose" style={{ listStyle: "none", padding: 0, marginTop: "0.5rem", color: "var(--ink-2)" }}>
+            {t.ui.examples.map((ex) => (
+              <li key={ex}>{ex}</li>
+            ))}
+          </ul>
+        </section>
+
+        <section style={{ marginTop: "2rem" }}>
+          <h2 style={{ fontSize: "1.35rem" }}>{t.suggest.queueTitle}</h2>
+          <p className="muted" style={{ marginBlock: "0.4rem 1rem" }}>
+            {t.suggest.queueLead}
+          </p>
+          {pending.length === 0 ? (
+            <p className="muted">{t.suggest.queueEmpty}</p>
+          ) : (
+            <div className="rows">
+              {pending.map((q) => (
+                <div
+                  key={q.id}
+                  className="row"
+                  style={{ display: "flex", gap: "1rem", alignItems: "center", justifyContent: "space-between", padding: "0.9rem 0" }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{pick(q.title, locale, q.lang)}</div>
+                    <div className="meta" style={{ marginTop: "0.3rem" }}>
+                      <span className="chip">{t.category[q.category as keyof typeof t.category] ?? q.category}</span>
+                      <span>
+                        {t.questions.resolves} {formatDate(q.resolveBy, locale)}
+                      </span>
+                      {q.suggestedBy && (
+                        <span>
+                          {t.questions.suggestedBy} {q.suggestedBy}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <form action={voteForQuestion} style={{ textAlign: "center", flex: "none" }}>
+                    <input type="hidden" name="locale" value={locale} />
+                    <input type="hidden" name="questionId" value={q.id} />
+                    <button className="btn quiet small" type="submit" aria-label={`${t.suggest.vote}: ${pick(q.title, locale, q.lang)}`}>
+                      {t.suggest.vote}
+                    </button>
+                    <div className="small muted" style={{ marginTop: "0.25rem" }}>
+                      {q.votes} {t.suggest.votes}
+                    </div>
+                  </form>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

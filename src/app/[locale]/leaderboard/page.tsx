@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Bar } from "@/components/Bar";
 import { fill, localeFrom } from "@/i18n";
 import { getLeaderboard } from "@/lib/data";
 import { MIN_RESOLVED_FOR_RANK } from "@/lib/scoring";
@@ -19,14 +20,10 @@ export default async function LeaderboardPage({ params, searchParams }: Props) {
   const { locale, t } = localeFrom((await params).locale);
   const track: Track = (await searchParams).track === "open" ? "open" : "closed";
   const board = await getLeaderboard(locale, track);
-
-  // One shared axis for every row, so the whiskers can be compared by eye.
-  const lows = board.rows.map((r) => r.scoreLow ?? r.score);
-  const axisMin = Math.min(0, Math.floor(Math.min(...lows, 0) / 10) * 10);
-  const axisMax = 100;
-  const x = (v: number) => `${((Math.min(axisMax, Math.max(axisMin, v)) - axisMin) / (axisMax - axisMin)) * 100}%`;
-
+  const hasMarket = board.marketQuestions > 0;
   let rank = 0;
+
+  const signed = (v: number) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}`;
 
   return (
     <>
@@ -35,11 +32,11 @@ export default async function LeaderboardPage({ params, searchParams }: Props) {
         {t.board.lead}
       </p>
 
-      <nav className="tabs" aria-label={t.board.title}>
+      <nav className="pills" aria-label={t.board.title} style={{ marginTop: "1.5rem" }}>
         {tracks.map((tr) => (
           <Link
             key={tr}
-            className="tab"
+            className="pill"
             href={`/${locale}/leaderboard?track=${tr}`}
             aria-current={tr === track ? "page" : undefined}
           >
@@ -47,10 +44,12 @@ export default async function LeaderboardPage({ params, searchParams }: Props) {
           </Link>
         ))}
       </nav>
-      <p className="muted small">{track === "closed" ? t.track.closedHint : t.track.openHint}</p>
+      <p className="muted small" style={{ marginTop: "0.6rem" }}>
+        {track === "closed" ? t.track.closedHint : t.track.openHint}
+      </p>
 
       {board.rows.length === 0 ? (
-        <p className="muted" style={{ marginTop: "1.5rem" }}>
+        <p className="panel soft" style={{ marginTop: "1.5rem" }}>
           {t.board.empty}
         </p>
       ) : (
@@ -61,65 +60,66 @@ export default async function LeaderboardPage({ params, searchParams }: Props) {
                 <tr>
                   <th>{t.board.rank}</th>
                   <th>{t.question.model}</th>
-                  <th className="num">{t.board.score}</th>
-                  <th>
-                    {t.board.interval} ({axisMin} {locale === "he" ? "עד" : "to"} {axisMax})
-                  </th>
-                  <th className="num">{t.board.relative}</th>
+                  <th style={{ minWidth: 220 }}>{t.board.score}</th>
+                  <th className="num">{t.ui.range}</th>
+                  {hasMarket && (
+                    <th className="num" title={t.ui.vsMarketHint}>
+                      {t.ui.vsMarket}
+                    </th>
+                  )}
                   <th className="num">{t.board.resolved}</th>
                 </tr>
               </thead>
               <tbody>
                 {board.rows.map((r) => {
-                  const isPanel = r.id === "panel";
-                  const label = isPanel ? "" : r.ranked ? String(++rank) : t.board.warmup;
+                  const special = r.id === "panel" || r.id === "market";
+                  const place = special ? null : r.ranked ? ++rank : null;
                   return (
-                    <tr key={r.id} className={isPanel ? "panel" : undefined}>
-                      <td>{label}</td>
+                    <tr key={r.id} className={special ? "special" : undefined}>
+                      <td>
+                        {place !== null ? (
+                          <span className={`rank ${place === 1 ? "first" : ""}`}>{place}</span>
+                        ) : special ? (
+                          ""
+                        ) : (
+                          <span className="chip">{t.board.warmup}</span>
+                        )}
+                      </td>
                       <td>
                         {r.model ? (
                           <Link className="model-name" href={`/${locale}/models/${r.id}`}>
-                            <span className="swatch" style={{ background: r.model.color }} />
                             {r.model.name}
                           </Link>
                         ) : (
-                          <span className="model-name">{t.board.panel}</span>
+                          <span className="model-name">{r.id === "market" ? t.ui.marketFull : t.board.panel}</span>
                         )}
                       </td>
-                      <td className="num">
-                        <strong dir="ltr">{r.score.toFixed(1)}</strong>
-                      </td>
                       <td>
-                        <div
-                          className="whisker"
-                          role="img"
-                          aria-label={
-                            r.scoreLow !== null && r.scoreHigh !== null
-                              ? `${r.score.toFixed(1)} (${r.scoreLow.toFixed(1)} - ${r.scoreHigh.toFixed(1)})`
-                              : r.score.toFixed(1)
-                          }
-                          title={
-                            r.scoreLow !== null && r.scoreHigh !== null
-                              ? `${r.scoreLow.toFixed(1)} - ${r.scoreHigh.toFixed(1)}`
-                              : undefined
-                          }
-                        >
-                          <div className="whisker-axis" />
-                          <div className="whisker-zero" style={{ left: x(0) }} />
-                          {r.scoreLow !== null && r.scoreHigh !== null && (
-                            <div
-                              className="whisker-range"
-                              style={{ left: x(r.scoreLow), right: `calc(100% - ${x(r.scoreHigh)})` }}
-                            />
-                          )}
-                          <div className="whisker-point" style={{ left: x(r.score) }} />
+                        <div className="score-cell">
+                          <strong dir="ltr">{r.score.toFixed(1)}</strong>
+                          <Bar
+                            value={Math.max(0, r.score) / 100}
+                            tone={r.id === "market" ? "market" : "brand"}
+                            label={`${r.score.toFixed(1)}`}
+                          />
                         </div>
                       </td>
-                      <td className="num">
-                        <span dir="ltr">
-                          {isPanel ? "" : `${r.relative >= 0 ? "+" : ""}${(r.relative * 100).toFixed(1)}`}
-                        </span>
+                      <td className="num muted small">
+                        {r.scoreLow !== null && r.scoreHigh !== null && (
+                          <span dir="ltr">
+                            {r.scoreLow.toFixed(0)} - {r.scoreHigh.toFixed(0)}
+                          </span>
+                        )}
                       </td>
+                      {hasMarket && (
+                        <td className="num">
+                          {r.vsMarket !== null && r.model && (
+                            <strong dir="ltr" style={{ color: r.vsMarket >= 0 ? "var(--yes)" : "var(--no)" }}>
+                              {signed(r.vsMarket)}
+                            </strong>
+                          )}
+                        </td>
+                      )}
                       <td className="num">{r.resolved}</td>
                     </tr>
                   );
@@ -129,6 +129,11 @@ export default async function LeaderboardPage({ params, searchParams }: Props) {
           </div>
           <div className="prose small muted" style={{ marginTop: "1.25rem" }}>
             <p>{fill(t.board.basedOn, { n: board.resolvedQuestions })}</p>
+            {hasMarket && (
+              <p>
+                {t.ui.vsMarketHint} {fill(t.ui.marketBasedOn, { n: board.marketQuestions })}
+              </p>
+            )}
             <p>{t.board.overlapNote}</p>
             <p>{fill(t.board.warmupNote, { n: MIN_RESOLVED_FOR_RANK })}</p>
           </div>
