@@ -19,12 +19,33 @@ with one provider; models without a key are skipped.
 | --- | --- | --- | --- |
 | Anthropic | Claude Opus, Claude Haiku | https://platform.claude.com/settings/keys | `ANTHROPIC_API_KEY` |
 | OpenAI | GPT Sol, GPT Luna | https://platform.openai.com/api-keys | `OPENAI_API_KEY` |
-| Google | Gemini | https://aistudio.google.com/apikey | `GEMINI_API_KEY` |
+| Google | Gemini Flash, Flash-Lite (free), Gemini 4 Argon | https://aistudio.google.com/apikey | `GEMINI_API_KEY` |
 | xAI | Grok | https://console.x.ai | `XAI_API_KEY` |
-| OpenRouter | DeepSeek, Llama | https://openrouter.ai/keys | `OPENROUTER_API_KEY` |
+| OpenRouter | Nemotron, ERNIE, Inkling (free), DeepSeek, Llama | https://openrouter.ai/keys | `OPENROUTER_API_KEY` |
 
-Each provider needs billing enabled and a small prepaid balance. Set a spending
-limit in each provider's console as a second safety net.
+### Starting for free
+
+Two keys are enough to run real forecasts at no cost, with no payment method:
+
+- `GEMINI_API_KEY` from Google AI Studio runs Gemini 3.8 Flash and Gemini 3.5
+  Flash-Lite on Google's free tier.
+- `OPENROUTER_API_KEY` runs three `:free` models. OpenRouter allows 50 free
+  requests a day per account, shared by all free models, so about 16 new
+  questions a day.
+
+The free models forecast closed book only. OpenRouter's free list changes
+often: if a model starts failing, pick another id ending in `:free` from
+https://openrouter.ai/models and replace it in `sanity.config.ts` as a new
+entry with a new `id`.
+
+The paid Gemini, DeepSeek and Llama entries are switched off in
+`sanity.config.ts` (`active: false`) because they share a key with a free
+model. Remove that line once billing is set up.
+
+### Paid providers
+
+Each paid provider needs billing enabled and a small prepaid balance. Set a
+spending limit in each provider's console as a second safety net.
 
 Also set in `.env.local`:
 

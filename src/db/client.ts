@@ -68,10 +68,20 @@ async function create(): Promise<Db> {
   return db;
 }
 
-/** Adds any model from the registry that the database does not know yet. */
+/**
+ * Adds any model from the registry that the database does not know yet, and
+ * makes the on/off switch of the known ones follow the config file. Nothing
+ * else about an existing model is touched: its name, API id and prices are
+ * part of its track record. A model removed from the config keeps its row.
+ */
 async function syncModels(db: Db) {
   const { modelRegistry } = await import("@/engine/registry");
-  await db.insert(schema.models).values(modelRegistry).onConflictDoNothing();
+  if (modelRegistry.length === 0) return;
+  const { sql } = await import("drizzle-orm");
+  await db
+    .insert(schema.models)
+    .values(modelRegistry.map((m) => ({ ...m, active: m.active ?? true })))
+    .onConflictDoUpdate({ target: schema.models.id, set: { active: sql`excluded.active` } });
 }
 
 export function getDb(): Promise<Db> {
