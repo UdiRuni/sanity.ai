@@ -95,6 +95,12 @@ export type ModelConfig = {
   priceOutPerMTok: number;
   /** USD per 1,000 calls of the provider's search tool. */
   searchPricePer1k: number;
+  /**
+   * Set to false to stop a model from forecasting without deleting its
+   * history. Leaving it out means true. The database follows this value on
+   * the next start.
+   */
+  active?: boolean;
 };
 
 /**
@@ -107,6 +113,18 @@ export type ModelConfig = {
  *
  * A new model version is a new entry with a new `id`. Repointing an existing
  * id at another model would mix two track records.
+ *
+ * FREE START (November 2026): the entries marked "free" cost nothing. The two
+ * Gemini models run on the free tier of a Google AI Studio key, and the
+ * OpenRouter models are ":free" variants (50 requests a day per account, all
+ * free models together). Their ids were read from Google's pricing page and
+ * from OpenRouter's model list on 16 November 2026; OpenRouter's free list
+ * changes often, so expect to swap one now and then. Free models run closed
+ * book only.
+ *
+ * A model whose provider has no API key simply sits out. The three entries
+ * with `active: false` share a key with a free model but cost money, so they
+ * are switched off until billing is set up; flip them to true then.
  */
 export const models: ModelConfig[] = [
   {
@@ -144,6 +162,7 @@ export const models: ModelConfig[] = [
     priceInPerMTok: 4,
     priceOutPerMTok: 20,
     searchPricePer1k: 14,
+    active: false,
   },
   {
     id: "grok-4-7",
@@ -192,6 +211,7 @@ export const models: ModelConfig[] = [
     priceInPerMTok: 0.3,
     priceOutPerMTok: 1.2,
     searchPricePer1k: 0,
+    active: false,
   },
   {
     id: "llama",
@@ -203,6 +223,67 @@ export const models: ModelConfig[] = [
     supportsOpenBook: false,
     priceInPerMTok: 0.2,
     priceOutPerMTok: 0.8,
+    searchPricePer1k: 0,
+    active: false,
+  },
+  {
+    id: "gemini-flash",
+    name: "Gemini 3.8 Flash",
+    provider: "google",
+    apiModel: "gemini-3.8-flash",
+    tier: "light",
+    color: "#1296a8",
+    supportsOpenBook: false, // free: search grounding is not reliably free on this tier
+    priceInPerMTok: 0,
+    priceOutPerMTok: 0,
+    searchPricePer1k: 0,
+  },
+  {
+    id: "gemini-flash-lite",
+    name: "Gemini 3.5 Flash-Lite",
+    provider: "google",
+    apiModel: "gemini-3.5-flash-lite",
+    tier: "light",
+    color: "#74a9e8",
+    supportsOpenBook: false, // free
+    priceInPerMTok: 0,
+    priceOutPerMTok: 0,
+    searchPricePer1k: 0,
+  },
+  {
+    id: "nemotron-ultra",
+    name: "Nemotron 3 Ultra",
+    provider: "openrouter",
+    apiModel: "nvidia/nemotron-3-ultra-550b-a55b:free",
+    tier: "open",
+    color: "#8a9a00",
+    supportsOpenBook: false, // free
+    priceInPerMTok: 0,
+    priceOutPerMTok: 0,
+    searchPricePer1k: 0,
+  },
+  {
+    id: "ernie-flash",
+    name: "ERNIE 5.5 Flash",
+    provider: "openrouter",
+    apiModel: "baidu/ernie-5.5-flash-preview:free",
+    tier: "light",
+    color: "#b0489c",
+    supportsOpenBook: false, // free
+    priceInPerMTok: 0,
+    priceOutPerMTok: 0,
+    searchPricePer1k: 0,
+  },
+  {
+    id: "inkling-small",
+    name: "Inkling 2 Small",
+    provider: "openrouter",
+    apiModel: "thinkingmachines/inkling-2-small:free",
+    tier: "light",
+    color: "#7a5a3a",
+    supportsOpenBook: false, // free
+    priceInPerMTok: 0,
+    priceOutPerMTok: 0,
     searchPricePer1k: 0,
   },
 ];
