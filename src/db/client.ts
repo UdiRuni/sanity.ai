@@ -2,6 +2,7 @@ import "server-only";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import * as schema from "./schema";
+import { withMigrationRetry } from "./retry";
 
 /**
  * Two database modes, same Postgres dialect in both:
@@ -27,9 +28,15 @@ async function create(): Promise<Db> {
     const postgres = (await import("postgres")).default;
     const sql = postgres(process.env.DATABASE_URL, { max: 5, prepare: false });
     const db = drizzle(sql, { schema });
-    await migrate(db, { migrationsFolder });
-    // Both drivers expose the same query builder; the cast keeps one type for callers.
-    await syncModels(db as unknown as Db);
+    try {
+      await withMigrationRetry(() => migrate(db, { migrationsFolder }));
+      // Both drivers expose the same query builder; the cast keeps one type for callers.
+      await syncModels(db as unknown as Db);
+    } catch (err) {
+      // getDb() retries on the next request with a new pool, so close this one.
+      await sql.end({ timeout: 2 }).catch(() => {});
+      throw err;
+    }
     return db as unknown as Db;
   }
 
