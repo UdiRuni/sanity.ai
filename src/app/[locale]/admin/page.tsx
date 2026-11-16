@@ -23,6 +23,9 @@ type Props = {
 
 export const metadata: Metadata = { title: "Admin", robots: { index: false } };
 
+// "Run a forecast round now" calls models from this page's server action.
+export const maxDuration = 300;
+
 export default async function AdminPage({ params, searchParams }: Props) {
   const { locale, t } = localeFrom((await params).locale);
   const sp = await searchParams;

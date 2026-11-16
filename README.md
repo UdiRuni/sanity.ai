@@ -85,16 +85,13 @@ All settings are environment variables, documented in `.env.example`.
 | `ADMIN_PASSWORD` | Enables the admin page. |
 | `CRON_SECRET` | Protects `/api/cron`. |
 | `MONTHLY_BUDGET_USD` | Hard cap on model spending per month. Default 50. |
-| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`, `OPENROUTER_API_KEY` | One per provider. A model with no key writes labelled demo forecasts instead of calling the provider. |
+| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`, `OPENROUTER_API_KEY` | One per provider. On a real database a model with no key sits out. In local demo mode it writes labelled demo forecasts. |
 
 ## Deploy
 
-1. Create a Postgres database (Supabase, Neon or similar) and set `DATABASE_URL`.
-   Migrations in `./drizzle` are applied automatically on first request.
-2. Set the provider keys, `ADMIN_PASSWORD` and `CRON_SECRET`. Models listed in
-   `sanity.config.ts` are added to the database automatically.
-3. Deploy to a Node host. `vercel.json` schedules `/api/cron` daily at 03:00 UTC.
-   PGlite is single-process and is not suitable for serverless hosting.
+Free to start: Vercel (Hobby) for the site, Neon (Free) for the database and
+GitHub Actions for the schedule. Step by step in [SETUP.md](SETUP.md#6-go-live).
+Vercel's Hobby plan is for non-commercial use, so move to Pro before charging.
 
 ## How it works
 

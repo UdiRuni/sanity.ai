@@ -218,6 +218,12 @@ export const limits = {
   defaultMonthlyBudgetUsd: 50,
   /** Most model calls in one scheduled run. */
   maxCallsPerRun: 200,
+  /**
+   * A run stops starting new model calls after this many seconds and reports
+   * that more work is left. Free hosting cuts a request off at 300 seconds, so
+   * this leaves room for the call in flight. The scheduler simply calls again.
+   */
+  maxRunSeconds: 200,
 };
 
 /**

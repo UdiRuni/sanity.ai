@@ -32,6 +32,11 @@ export async function spentThisMonth(now = new Date()): Promise<number> {
   return Number(row?.total ?? 0);
 }
 
+/** Whether a model with no API key may write a labelled demo forecast. */
+export function mockAllowed(): boolean {
+  return !process.env.DATABASE_URL || process.env.MOCK_FORECASTS === "true";
+}
+
 export function monthlyBudget(): number {
   return Number(process.env.MONTHLY_BUDGET_USD || limits.defaultMonthlyBudgetUsd);
 }
@@ -42,6 +47,8 @@ export type RunReport = {
   failed: { model: string; question: string; error: string }[];
   costUsd: number;
   stoppedForBudget: boolean;
+  /** True when the time or call limit was reached with forecasts still missing. Call again. */
+  moreWork: boolean;
   mock: number;
   marketPrices: number;
 };
@@ -74,9 +81,12 @@ export async function runForecastRound(opts: { now?: Date; maxCalls?: number } =
     failed: [],
     costUsd: 0,
     stoppedForBudget: false,
+    moreWork: false,
     mock: 0,
     marketPrices: 0,
   };
+  const started = Date.now();
+  const outOfTime = () => Date.now() - started > limits.maxRunSeconds * 1000;
 
   const open = await db.select().from(schema.questions).where(eq(schema.questions.status, "open"));
 
@@ -84,6 +94,18 @@ export async function runForecastRound(opts: { now?: Date; maxCalls?: number } =
   for (const q of open) {
     const ref = q.marketUrl ? parseMarketUrl(q.marketUrl) : null;
     if (!ref) continue;
+    // One market price a day per question is enough, however often the run is called.
+    const [recent] = await db
+      .select({ id: schema.marketPrices.id })
+      .from(schema.marketPrices)
+      .where(
+        and(
+          eq(schema.marketPrices.questionId, q.id),
+          gte(schema.marketPrices.createdAt, new Date(now.getTime() - 20 * 60 * 60 * 1000)),
+        ),
+      )
+      .limit(1);
+    if (recent) continue;
     try {
       const probability = await fetchMarketPrice(ref);
       await db.insert(schema.marketPrices).values({ questionId: q.id, probability, source: ref.source, createdAt: now });
@@ -125,7 +147,16 @@ export async function runForecastRound(opts: { now?: Date; maxCalls?: number } =
           report.skipped++;
           continue;
         }
-        if (calls >= maxCalls) return report;
+        // Demo numbers are only for the local demo database. On a real database
+        // a model without an API key simply does not take part.
+        if (!hasKey(model.provider as ProviderId) && !mockAllowed()) {
+          report.skipped++;
+          continue;
+        }
+        if (calls >= maxCalls || outOfTime()) {
+          report.moreWork = true;
+          return report;
+        }
         if (spent >= budget) {
           report.stoppedForBudget = true;
           return report;

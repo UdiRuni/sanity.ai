@@ -33,6 +33,15 @@ async function create(): Promise<Db> {
     return db as unknown as Db;
   }
 
+  // Serverless hosts have no writable disk and many processes, so the embedded
+  // database cannot work there. Fail with an instruction instead of a stack trace.
+  if (process.env.VERCEL || process.env.NETLIFY) {
+    throw new Error(
+      "DATABASE_URL is not set. Create a Postgres database (for example a free Neon project) " +
+        "and add its connection string as the DATABASE_URL environment variable, then redeploy.",
+    );
+  }
+
   const { PGlite } = await import("@electric-sql/pglite");
   const { drizzle } = await import("drizzle-orm/pglite");
   const { migrate } = await import("drizzle-orm/pglite/migrator");

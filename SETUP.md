@@ -77,9 +77,51 @@ on the admin page.
 
 ## 6. Go live
 
-1. Create a Postgres database (Supabase or Neon) and set `DATABASE_URL`.
-2. Set the same variables on your host, plus `CRON_SECRET` (any long random string).
-3. Deploy. `vercel.json` runs the forecast round every day at 03:00 UTC.
+Free to start. About 20 minutes.
+
+**A. Database (Neon)**
+
+1. Sign up at https://neon.com and create a project. Pick a region in Europe.
+2. Copy the connection string that starts with `postgresql://`. Use the
+   "pooled" one.
+
+**B. Site (Vercel)**
+
+1. Sign up at https://vercel.com with your GitHub account.
+2. "Add New" > "Project" > import `UdiRuni/sanity.ai`. Leave the build settings alone.
+3. Before deploying, open "Environment Variables" and add:
+
+   | Name | Value |
+   | --- | --- |
+   | `DATABASE_URL` | the Neon connection string |
+   | `ADMIN_PASSWORD` | a password you choose |
+   | `CRON_SECRET` | any long random string |
+   | `MONTHLY_BUDGET_USD` | `50` |
+   | provider keys | the same keys as in `.env.local` |
+
+4. Deploy. The tables are created on the first visit, and the site starts empty.
+5. Open `https://<your-site>/he/admin`, sign in, and check the API keys panel.
+
+**C. Schedule (GitHub Actions)**
+
+Vercel's free plan runs a scheduled job once a day and stops any request after
+300 seconds, so the forecast runs are driven from GitHub instead. In the
+repository on GitHub: Settings > Secrets and variables > Actions.
+
+- Under "Variables" add `SITE_URL` = your site address, e.g. `https://sanity-ai.vercel.app`
+- Under "Secrets" add `CRON_SECRET` = the same value you gave Vercel
+
+The "Forecast rounds" workflow then runs every three hours. To run it right
+away: Actions > Forecast rounds > Run workflow.
+
+**Good to know**
+
+- A model whose provider key is missing sits out. Nothing fake is written to a
+  real database.
+- Vercel's free plan is for non-commercial use. Move to Pro before you charge
+  or run ads.
+- GitHub pauses scheduled workflows in a repository with no activity for 60
+  days. Any commit, or pressing "Run workflow", keeps it going.
 
 ## 7. Pull request reviews (optional)
 

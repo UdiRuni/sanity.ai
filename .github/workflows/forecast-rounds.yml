@@ -1,0 +1,56 @@
+name: Forecast rounds
+
+# Calls the site's /api/cron endpoint so models forecast new questions, open-book
+# forecasts refresh weekly, due questions lock and market prices are recorded.
+#
+# Why this exists: free hosting stops a request after 300 seconds and allows a
+# scheduled job only once a day. Each call here does a slice of the work and
+# reports whether more is left; calling again is always safe.
+#
+# Setup, in the GitHub repository settings under "Secrets and variables" > "Actions":
+#   variable SITE_URL     the deployed site, e.g. https://sanity-ai.vercel.app
+#   secret   CRON_SECRET  the same value as the CRON_SECRET set on the host
+
+on:
+  schedule:
+    - cron: "17 */3 * * *" # every three hours
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: forecast-rounds
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SITE_URL: ${{ vars.SITE_URL }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: Run forecast slices
+        run: |
+          if [ -z "$SITE_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "::notice::SITE_URL variable or CRON_SECRET secret is not set. Nothing to do."
+            exit 0
+          fi
+          url="${SITE_URL%/}/api/cron"
+
+          for slice in 1 2 3 4 5 6; do
+            status=$(curl -sS -o response.json -w '%{http_code}' --max-time 320 \
+              -H "Authorization: Bearer $CRON_SECRET" "$url" || echo "000")
+            if [ "$status" != "200" ]; then
+              echo "::error::Slice $slice: $url returned HTTP $status"
+              head -c 500 response.json 2>/dev/null || true
+              exit 1
+            fi
+            jq -r '"Slice '"$slice"': wrote \(.written), skipped \(.skipped), failed \(.failed | length), market prices \(.marketPrices), cost $\(.costUsd)"' response.json
+            jq -r '.failed[]? | "::warning::\(.model) on \(.question): \(.error)"' response.json | head -20
+            if [ "$(jq -r '.stoppedForBudget' response.json)" = "true" ]; then
+              echo "::warning::The monthly model budget is used up. No more forecasts until next month or a higher MONTHLY_BUDGET_USD."
+              break
+            fi
+            [ "$(jq -r '.moreWork' response.json)" = "true" ] || break
+          done

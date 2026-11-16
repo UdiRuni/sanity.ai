@@ -25,7 +25,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
 
   return (
     <>
-      <section className="hero">
+      <section className="hero" style={featured ? undefined : { gridTemplateColumns: "minmax(0, 1fr)", maxWidth: "44rem" }}>
         <div>
           <h1>{t.home.heroTitle}</h1>
           <p className="lead" style={{ marginTop: "1.1rem" }}>
