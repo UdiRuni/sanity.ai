@@ -6,6 +6,23 @@ import type { ParsedForecast } from "./parse";
  * mock=true so the site can label them as demo data.
  */
 
+/** Made-up per-model skill, only so demo rankings are not a tie. */
+export const demoSkill: Record<string, number> = {
+  "claude-opus-5-5": 0.82,
+  "gpt-sol": 0.8,
+  "gemini-4": 0.76,
+  "grok-4-7": 0.68,
+  "claude-haiku-5-5": 0.55,
+  "gpt-luna": 0.5,
+  deepseek: 0.58,
+  llama: 0.42,
+  "gemini-flash": 0.62,
+  "gemini-flash-lite": 0.5,
+  "nemotron-ultra": 0.57,
+  "ernie-flash": 0.44,
+  "inkling-small": 0.47,
+};
+
 export function hash(input: string): number {
   let h = 2166136261;
   for (let i = 0; i < input.length; i++) {

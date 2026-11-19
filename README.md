@@ -19,6 +19,7 @@ This repository is phase 1 of the product spec: the public arena.
 | Forecast engine: closed book and open book tracks, weekly open-book updates, monthly budget cap, cost logged per call | Built |
 | Scoring: time-weighted Brier, 0 to 100 score, uncertainty ranges, calibration, median "panel" | Built, with tests |
 | Prediction market as a competitor: market link per question, daily price snapshots, market row and "vs. market" column on the leaderboard | Built; the price fetchers are unverified |
+| Sanity check: every model asked the same question in mirror versions (negated, earlier deadline, other language, asker leaning yes or no); contradiction per check, sanity board from day one, share page per contradiction, "contradiction of the week" on the home page | Built, with tests; not yet run against live models |
 | Daily scheduled run (`/api/cron`) | Built |
 | Logo, favicon, social card | Built (`public/brand`, `src/app/icon.svg`) |
 
@@ -101,6 +102,8 @@ suggestion -> admin approves -> open -> locked -> resolved (or annulled)
                  forecast round (cron or admin button)
                  closed book: one forecast when the question opens
                  open book:   one forecast per week until the lock
+                 then, with what is left of the run:
+                 sanity check: up to six mirror versions per model, closed book
 ```
 
 - `sanity.config.ts`: providers, endpoints, models, prices and limits, in one file.
@@ -110,6 +113,9 @@ suggestion -> admin approves -> open -> locked -> resolved (or annulled)
 - `src/engine/parse.ts`: turns a model reply into a probability in [0.01, 0.99].
 - `src/engine/run.ts`: the round runner, with the budget guard.
 - `src/lib/scoring.ts`: Brier, the 0 to 100 score, ranges and calibration.
+- `src/engine/sanity.ts` and `src/lib/sanity.ts`: the sanity check's prompts,
+  plan and scoring. A contradiction is measured in probability points and
+  equals the guaranteed profit of betting against the model at its own prices.
 - `src/lib/data.ts`: queries and the leaderboard.
 - `src/db/schema.ts`: tables. Forecasts are append-only.
 - `src/i18n`: dictionaries. Adding a country edition means adding a locale in

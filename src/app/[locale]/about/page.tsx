@@ -39,6 +39,26 @@ export default async function AboutPage({ params }: Props) {
           <h2>{t.ui.marketFull}</h2>
           <p style={{ marginTop: "0.6rem", color: "var(--ink-2)" }}>{t.ui.marketHint}</p>
         </section>
+        <section style={{ marginTop: "2.25rem" }} id="sanity">
+          <h2>{t.sanity.about.h}</h2>
+          {t.sanity.about.ps.map((p) => (
+            <p key={p} style={{ marginTop: "0.6rem", color: "var(--ink-2)" }}>
+              {p}
+            </p>
+          ))}
+          <ul className="check-defs" style={{ marginTop: "0.9rem", color: "var(--ink-2)" }}>
+            {(["negation", "deadline", "language", "sycophancy"] as const).map((c) => (
+              <li key={c}>
+                <strong style={{ color: "var(--ink)" }}>{t.sanity.checks[c]}</strong>: {t.sanity.checkHints[c]}
+              </li>
+            ))}
+          </ul>
+          <p style={{ marginTop: "0.9rem" }}>
+            <Link className="link" href={`/${locale}/leaderboard?track=sanity`}>
+              {t.sanity.seeBoard}
+            </Link>
+          </p>
+        </section>
       </div>
       <section className="section">
         <div className="cta-band">

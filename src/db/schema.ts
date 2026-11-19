@@ -52,6 +52,10 @@ export const questions = pgTable(
     // market's price is tracked and scored like one more competitor.
     marketUrl: text("market_url"),
     marketSource: text("market_source"), // key in sanity.config.ts markets, or "manual"
+    // True when the question asks whether something happens on or before its
+    // resolution date. Then the chance of YES by an earlier date can only be
+    // lower, which the sanity test's deadline check relies on. Set by the admin.
+    eventByDeadline: boolean("event_by_deadline").notNull().default(false),
     category: text("category").notNull().default("world"),
     suggestedBy: text("suggested_by"), // display name
     suggesterId: text("suggester_id"), // anonymous browser id, for rate limiting
@@ -113,6 +117,60 @@ export const marketPrices = pgTable("market_prices", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** The mirror versions of a question that the sanity test asks. */
+export type SanityVariantName =
+  | "base" // the question as it is
+  | "negated" // "will the answer be NO?"
+  | "earlier" // the same question with an earlier deadline
+  | "translated" // the same question in another language
+  | "leanYes" // the asker says they are sure the answer is yes
+  | "leanNo"; // the asker says they are sure the answer is no
+
+/**
+ * One sanity test per question (batch 0; the column leaves room for repeats).
+ * The plan is fixed when the test starts, so every model gets the same
+ * prompts with the same date, whenever its calls happen.
+ */
+export const sanityTests = pgTable(
+  "sanity_tests",
+  {
+    id: serial("id").primaryKey(),
+    questionId: integer("question_id")
+      .notNull()
+      .references(() => questions.id),
+    batch: integer("batch").notNull().default(0),
+    promptVersion: text("prompt_version").notNull(),
+    askedOn: timestamp("asked_on", { withTimezone: true }).notNull(), // "today" in every prompt
+    earlierBy: timestamp("earlier_by", { withTimezone: true }), // null: no deadline check
+    translateTo: text("translate_to"), // null: no language check
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("sanity_tests_question_batch").on(t.questionId, t.batch)],
+);
+
+/** One model's answer to one variant. Append-only, like forecasts. */
+export const sanityProbes = pgTable(
+  "sanity_probes",
+  {
+    id: serial("id").primaryKey(),
+    testId: integer("test_id")
+      .notNull()
+      .references(() => sanityTests.id),
+    modelId: text("model_id")
+      .notNull()
+      .references(() => models.id),
+    variant: text("variant").$type<SanityVariantName>().notNull(),
+    probability: doublePrecision("probability").notNull(), // probability the variant resolves YES
+    rationale: text("rationale").notNull(),
+    tokensIn: integer("tokens_in").notNull().default(0),
+    tokensOut: integer("tokens_out").notNull().default(0),
+    costUsd: doublePrecision("cost_usd").notNull().default(0),
+    mock: boolean("mock").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("sanity_probes_unique").on(t.testId, t.modelId, t.variant)],
+);
+
 export const votes = pgTable(
   "votes",
   {
@@ -129,3 +187,5 @@ export type Model = typeof models.$inferSelect;
 export type Question = typeof questions.$inferSelect;
 export type Forecast = typeof forecasts.$inferSelect;
 export type MarketPrice = typeof marketPrices.$inferSelect;
+export type SanityTest = typeof sanityTests.$inferSelect;
+export type SanityProbe = typeof sanityProbes.$inferSelect;

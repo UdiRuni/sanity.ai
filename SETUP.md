@@ -96,7 +96,26 @@ every scheduled run and scores it on the leaderboard next to the models. If the
 automatic fetch fails, type the current price into the box next to the question
 on the admin page.
 
-## 6. Go live
+## 6. The sanity check
+
+Every scheduled run starts one sanity test a day (newest open question
+first), after the forecasts. Each model is asked the question in mirror
+versions, each in its own call: negated, with the asker leaning yes, and with
+the asker leaning no. Two more checks need a word from you on the admin page,
+either when you approve the question or later under "Sanity check":
+
+- Tick "the question asks whether something happens by the resolution date"
+  for questions like "will X happen by March?". That enables the earlier
+  deadline check. Leave it off for "will X be above Y on that date?": an earlier
+  date proves nothing there.
+- Add a translation into the other site language to enable the language check.
+
+The "Run the sanity check now" button tests one question right away, outside
+the daily quota. A full test costs up to six calls per model, so on the free
+OpenRouter tier (50 requests a day) three models use 18 calls per test. Change
+`sanity.testsPerDay` or `sanity.checks` in `sanity.config.ts` to spend less.
+
+## 7. Go live
 
 Free to start. About 20 minutes.
 
@@ -144,7 +163,7 @@ away: Actions > Forecast rounds > Run workflow.
 - GitHub pauses scheduled workflows in a repository with no activity for 60
   days. Any commit, or pressing "Run workflow", keeps it going.
 
-## 7. Pull request reviews (optional)
+## 8. Pull request reviews (optional)
 
 The workflow in `.github/workflows/gemini-review.yml` posts a Gemini review on
 every pull request. In the GitHub repository settings, add a secret named
