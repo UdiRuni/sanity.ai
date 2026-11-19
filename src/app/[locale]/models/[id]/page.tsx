@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { sanity as sanitySettings } from "../../../../../sanity.config";
 import { CalibrationChart } from "@/components/CalibrationChart";
+import { Dot } from "@/components/Dot";
 import { ContradictionCard } from "@/components/Sanity";
 import { fill, formatDate, localeFrom, pct } from "@/i18n";
 import { getModelProfile, getSanityBoard, pick } from "@/lib/data";
@@ -67,7 +68,10 @@ export default async function ModelPage({ params }: Props) {
           {t.model.since} {formatDate(model.joinedAt, locale)}
         </span>
       </div>
-      <h1 style={{ marginTop: "0.8rem" }}>{model.name}</h1>
+      <h1 style={{ marginTop: "0.8rem", display: "flex", alignItems: "center", gap: "0.85rem" }}>
+        <Dot color={model.color} />
+        {model.name}
+      </h1>
 
       <div className="grid" style={{ marginTop: "1.75rem", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
         {profile.rows.map(({ track, row }) => (
@@ -150,7 +154,7 @@ export default async function ModelPage({ params }: Props) {
             {contradictions.length > 0 && (
               <>
                 <h3 style={{ marginTop: "1.75rem" }}>{t.sanity.worstOfModel}</h3>
-                <div className="grid" style={{ marginTop: "0.9rem" }}>
+                <div className="grid cascade" style={{ marginTop: "0.9rem" }}>
                   {contradictions.map((e) => (
                     <ContradictionCard
                       key={`${e.question.id}-${e.result.check}`}

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { CtaBand } from "@/components/CtaBand";
 import { AskIcon, DecideIcon, ForecastIcon } from "@/components/Icons";
 import { localeFrom } from "@/i18n";
 
@@ -17,7 +18,7 @@ export default async function AboutPage({ params }: Props) {
   return (
     <>
       <h1>{t.about.title}</h1>
-      <ol className="steps" style={{ listStyle: "none", padding: 0, marginTop: "1.75rem" }}>
+      <ol className="steps cascade" style={{ listStyle: "none", padding: 0, marginTop: "1.75rem" }}>
         {t.ui.steps.map((s, i) => (
           <li className="step" key={s.h}>
             <div className="step-icon">{icons[i]}</div>
@@ -60,17 +61,7 @@ export default async function AboutPage({ params }: Props) {
           </p>
         </section>
       </div>
-      <section className="section">
-        <div className="cta-band">
-          <div>
-            <h2>{t.ui.ctaTitle}</h2>
-            <p>{t.ui.ctaBody}</p>
-          </div>
-          <Link className="btn big" href={`/${locale}/suggest`}>
-            {t.home.heroCta}
-          </Link>
-        </div>
-      </section>
+      <CtaBand t={t} locale={locale} />
     </>
   );
 }

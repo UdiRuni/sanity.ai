@@ -4,6 +4,8 @@ import { fill, formatDate, pct, type Dictionary } from "@/i18n";
 import { pick, type QuestionSanity } from "@/lib/data";
 import { points, type CheckResult } from "@/lib/sanity";
 import type { Locale } from "@/lib/site";
+import { Dot } from "./Dot";
+import { Num } from "./Num";
 
 /** What a check description needs to know about where it was asked. */
 export type CheckContext = { t: Dictionary; locale: Locale; question: Question; test: SanityTest };
@@ -102,7 +104,12 @@ export function SanitySection({
     <section className="section" id="sanity" aria-labelledby="sanity-title">
       <div className="section-head">
         <div>
-          <h2 id="sanity-title">{t.sanity.name}</h2>
+          <h2 id="sanity-title" style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+            <span className="chip violet" aria-hidden="true">
+              ✓✕
+            </span>
+            {t.sanity.name}
+          </h2>
           <p className="muted" style={{ marginTop: "0.25rem" }}>
             {t.sanity.lead}
           </p>
@@ -112,7 +119,7 @@ export function SanitySection({
         </Link>
       </div>
 
-      <div className="rows">
+      <div className="rows cascade">
         {sanity.results.map((res) => (
           <details className="row" key={res.model.id}>
             <summary className="sanity-summary">
@@ -120,6 +127,7 @@ export function SanitySection({
                 <span className="caret" aria-hidden="true">
                   ▸
                 </span>
+                <Dot color={res.model.color} />
                 {res.model.name}
               </span>
               <span className="sanity-chips">
@@ -171,6 +179,7 @@ export function ContradictionCard({
   modelId,
   ctx,
   feature = false,
+  night = false,
 }: {
   r: CheckResult;
   modelName: string;
@@ -178,11 +187,13 @@ export function ContradictionCard({
   ctx: CheckContext;
   /** The big version for the home page: the size of the contradiction as a figure. */
   feature?: boolean;
+  /** On a dark card, with the number in coral. */
+  night?: boolean;
 }) {
   const { t, locale, question } = ctx;
   const Heading = feature ? "h2" : "h3";
   return (
-    <article className={`card sanity-card ${feature ? "feature" : ""}`}>
+    <article className={`card sanity-card ${feature ? "feature" : ""} ${night ? "night" : ""}`}>
       <div className="meta">
         <CheckChip r={r} t={t} />
         <span>{t.sanity.caught}</span>
@@ -196,12 +207,16 @@ export function ContradictionCard({
         <div className="card-figure">
           {r.check === "negation" ? (
             <>
-              <span className="figure big">{pct(r.a + r.b)}</span>
+              <span className="figure big">
+                <Num value={(r.a + r.b) * 100} suffix="%" />
+              </span>
               <span className="figure-label">{t.sanity.instead100}</span>
             </>
           ) : (
             <>
-              <span className="figure big">{points(r.contradiction)}</span>
+              <span className="figure big">
+                <Num value={points(r.contradiction)} />
+              </span>
               <span className="figure-label">{t.sanity.size}</span>
             </>
           )}

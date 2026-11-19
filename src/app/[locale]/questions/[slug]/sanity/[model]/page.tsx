@@ -3,8 +3,9 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { checkLines, headline, sharePath, verdict, type CheckContext } from "@/components/Sanity";
+import { Num } from "@/components/Num";
 import { ShareButtons } from "@/components/ShareButtons";
-import { fill, localeFrom, pct, type Dictionary } from "@/i18n";
+import { fill, localeFrom, type Dictionary } from "@/i18n";
 import { getQuestion, getQuestionSanity, pick } from "@/lib/data";
 import { points } from "@/lib/sanity";
 import { site, type Locale } from "@/lib/site";
@@ -68,7 +69,7 @@ export default async function SanitySharePage({ params, searchParams }: Props) {
   return (
     <article style={{ maxWidth: "46rem", marginInline: "auto" }}>
       <div className="meta">
-        <span className="chip open">{t.sanity.name}</span>
+        <span className="chip violet">{t.sanity.name}</span>
         <span>{t.sanity.checks[featured.check]}</span>
         {!featured.passed && <span>{t.sanity.caught}</span>}
       </div>
@@ -76,16 +77,20 @@ export default async function SanitySharePage({ params, searchParams }: Props) {
         {text}
       </h1>
 
-      <section className="card feature" style={{ marginTop: "1.5rem" }}>
+      <section className="card feature sanity-card" style={{ marginTop: "1.5rem" }}>
         <div className="card-figure">
           {featured.check === "negation" ? (
             <>
-              <span className="figure big">{pct(featured.a + featured.b)}</span>
+              <span className="figure big">
+                <Num value={(featured.a + featured.b) * 100} suffix="%" />
+              </span>
               <span className="figure-label">{t.sanity.instead100}</span>
             </>
           ) : (
             <>
-              <span className="figure big">{points(featured.contradiction)}</span>
+              <span className="figure big">
+                <Num value={points(featured.contradiction)} />
+              </span>
               <span className="figure-label">{t.sanity.size}</span>
             </>
           )}

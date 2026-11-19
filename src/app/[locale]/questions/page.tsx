@@ -5,6 +5,7 @@ import type { QuestionStatus } from "@/db/schema";
 import { localeFrom } from "@/i18n";
 import { listQuestions } from "@/lib/data";
 import { categories } from "@/lib/site";
+import { toneClass } from "@/lib/colors";
 
 type Props = {
   params: Promise<{ locale: string }>;
@@ -64,7 +65,7 @@ export default async function QuestionsPage({ params, searchParams }: Props) {
           {t.ui.all}
         </Link>
         {categories.map((c) => (
-          <Link key={c} className="pill" href={href(status, c)} aria-current={c === topic ? "page" : undefined}>
+          <Link key={c} className={`pill ${toneClass(c)}`} href={href(status, c)} aria-current={c === topic ? "page" : undefined}>
             {t.category[c]}
           </Link>
         ))}
@@ -80,7 +81,7 @@ export default async function QuestionsPage({ params, searchParams }: Props) {
           </p>
         </div>
       ) : (
-        <div className="grid" style={{ marginTop: "2rem" }}>
+        <div className="grid cascade" style={{ marginTop: "2rem" }}>
           {views.map((v) => (
             <QuestionCard key={v.question.id} view={v} t={t} locale={locale} />
           ))}

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { sanity as sanitySettings } from "../../../../sanity.config";
 import { Bar } from "@/components/Bar";
+import { Dot } from "@/components/Dot";
 import { fill, localeFrom, type Dictionary } from "@/i18n";
 import { getLeaderboard, getSanityBoard } from "@/lib/data";
 import { allChecks, points } from "@/lib/sanity";
@@ -18,6 +19,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return { title: t.board.title };
 }
 
+const MEDALS = ["first", "second", "third"];
+const TRACK_TONE: Record<Track, string> = { closed: "tone-brand", open: "tone-teal" };
+
 /** The accuracy tracks, then the sanity board. */
 function BoardPills({ locale, t, current }: { locale: Locale; t: Dictionary; current: Track | "sanity" }) {
   return (
@@ -25,7 +29,7 @@ function BoardPills({ locale, t, current }: { locale: Locale; t: Dictionary; cur
       {tracks.map((tr) => (
         <Link
           key={tr}
-          className="pill"
+          className={`pill ${TRACK_TONE[tr]}`}
           href={`/${locale}/leaderboard?track=${tr}`}
           aria-current={tr === current ? "page" : undefined}
         >
@@ -33,7 +37,7 @@ function BoardPills({ locale, t, current }: { locale: Locale; t: Dictionary; cur
         </Link>
       ))}
       <Link
-        className="pill"
+        className="pill tone-violet"
         href={`/${locale}/leaderboard?track=sanity`}
         aria-current={current === "sanity" ? "page" : undefined}
       >
@@ -80,27 +84,28 @@ async function SanityBoardView({ locale, t }: { locale: Locale; t: Dictionary })
                   <th className="num">{t.sanity.checksCount}</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="cascade">
                 {board.rows.map((r) => {
                   const place = r.ranked ? ++rank : null;
                   return (
                     <tr key={r.model.id}>
                       <td>
                         {place !== null ? (
-                          <span className={`rank ${place === 1 ? "first" : ""}`}>{place}</span>
+                          <span className={`rank ${MEDALS[place - 1] ?? ""}`}>{place}</span>
                         ) : (
                           <span className="chip">{t.board.warmup}</span>
                         )}
                       </td>
                       <td>
                         <Link className="model-name" href={`/${locale}/models/${r.model.id}#sanity`}>
+                          <Dot color={r.model.color} />
                           {r.model.name}
                         </Link>
                       </td>
                       <td>
                         <div className="score-cell">
                           <strong dir="ltr">{r.score.toFixed(1)}</strong>
-                          <Bar value={Math.max(0, r.score) / 100} label={r.score.toFixed(1)} />
+                          <Bar value={Math.max(0, r.score) / 100} label={r.score.toFixed(1)} color="var(--violet)" index={rank} />
                         </div>
                       </td>
                       <td className="num muted small">
@@ -192,7 +197,7 @@ export default async function LeaderboardPage({ params, searchParams }: Props) {
                   <th className="num">{t.board.resolved}</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="cascade">
                 {board.rows.map((r) => {
                   const special = r.id === "panel" || r.id === "market";
                   const place = special ? null : r.ranked ? ++rank : null;
@@ -200,7 +205,7 @@ export default async function LeaderboardPage({ params, searchParams }: Props) {
                     <tr key={r.id} className={special ? "special" : undefined}>
                       <td>
                         {place !== null ? (
-                          <span className={`rank ${place === 1 ? "first" : ""}`}>{place}</span>
+                          <span className={`rank ${MEDALS[place - 1] ?? ""}`}>{place}</span>
                         ) : special ? (
                           ""
                         ) : (
@@ -210,6 +215,7 @@ export default async function LeaderboardPage({ params, searchParams }: Props) {
                       <td>
                         {r.model ? (
                           <Link className="model-name" href={`/${locale}/models/${r.id}`}>
+                            <Dot color={r.model.color} />
                             {r.model.name}
                           </Link>
                         ) : (
@@ -223,6 +229,7 @@ export default async function LeaderboardPage({ params, searchParams }: Props) {
                             value={Math.max(0, r.score) / 100}
                             tone={r.id === "market" ? "market" : "brand"}
                             label={`${r.score.toFixed(1)}`}
+                            color={r.model?.color}
                           />
                         </div>
                       </td>
