@@ -26,7 +26,9 @@ async function create(): Promise<Db> {
     const { drizzle } = await import("drizzle-orm/postgres-js");
     const { migrate } = await import("drizzle-orm/postgres-js/migrator");
     const postgres = (await import("postgres")).default;
-    const sql = postgres(process.env.DATABASE_URL, { max: 5, prepare: false });
+    // Notices are informational ("schema already exists, skipping" on every
+    // cold start); they would only clutter the function logs.
+    const sql = postgres(process.env.DATABASE_URL, { max: 5, prepare: false, onnotice: () => {} });
     const db = drizzle(sql, { schema });
     try {
       await withMigrationRetry(() => migrate(db, { migrationsFolder }));

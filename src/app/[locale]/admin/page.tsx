@@ -4,7 +4,10 @@ import { monthlyBudget, spentThisMonth } from "@/engine/run";
 import { hasKey, providerKeyEnv, type ProviderId } from "@/engine/registry";
 import { fill, formatDate, localeFrom } from "@/i18n";
 import { adminEnabled, isAdmin } from "@/lib/admin";
+import type { Question } from "@/db/schema";
+import type { Dictionary } from "@/i18n";
 import { getAdminData, pick } from "@/lib/data";
+import { site } from "@/lib/site";
 import { now } from "@/lib/time";
 import {
   adminLogin,
@@ -14,7 +17,56 @@ import {
   rejectQuestion,
   resolveQuestion,
   runRoundNow,
+  runSanityNow,
+  saveSanitySettings,
 } from "../actions";
+
+/** The site language a question can be translated into for the language check. */
+function otherLang(q: Question): string {
+  return site.locales.find((l) => l !== q.lang) ?? "en";
+}
+
+/**
+ * The sanity test fields shared by the approval form and the settings form.
+ * They sit inside the caller's <form>.
+ */
+function SanityFields({ q, t }: { q: Question; t: Dictionary }) {
+  const other = otherLang(q);
+  const lang = t.sanity.langNames[other] ?? other;
+  return (
+    <>
+      <input type="hidden" name="otherLang" value={other} />
+      <div className="field check-field">
+        <label>
+          <input type="checkbox" name="eventByDeadline" defaultChecked={q.eventByDeadline} />
+          <span>{t.admin.eventByDeadline}</span>
+        </label>
+      </div>
+      <details className="field">
+        <summary className="small" style={{ cursor: "pointer", fontWeight: 600 }}>
+          {fill(t.admin.translation, { lang })}
+        </summary>
+        <div style={{ marginTop: "0.6rem" }}>
+          <div className="field">
+            <label htmlFor={`title-${other}-${q.id}`}>{fill(t.admin.translationTitle, { lang })}</label>
+            <input id={`title-${other}-${q.id}`} name="titleOther" defaultValue={q.title[other] ?? ""} dir="auto" lang={other} />
+          </div>
+          <div className="field">
+            <label htmlFor={`criteria-${other}-${q.id}`}>{fill(t.admin.translationCriteria, { lang })}</label>
+            <textarea
+              id={`criteria-${other}-${q.id}`}
+              name="criteriaOther"
+              defaultValue={q.criteria[other] ?? ""}
+              dir="auto"
+              lang={other}
+            />
+          </div>
+          <p className="hint small muted">{t.admin.translationHint}</p>
+        </div>
+      </details>
+    </>
+  );
+}
 
 type Props = {
   params: Promise<{ locale: string }>;
@@ -64,7 +116,7 @@ export default async function AdminPage({ params, searchParams }: Props) {
     );
   }
 
-  const [{ pending, awaiting }, spent] = await Promise.all([getAdminData(), spentThisMonth()]);
+  const [{ pending, awaiting, sanityAnswers }, spent] = await Promise.all([getAdminData(), spentThisMonth()]);
   const budget = monthlyBudget();
   const nowMs = now().getTime();
   const due = awaiting.filter((q) => q.resolveBy.getTime() <= nowMs || q.status === "locked");
@@ -89,7 +141,23 @@ export default async function AdminPage({ params, searchParams }: Props) {
             skipped: sp.skipped ?? "0",
             failed: sp.failed ?? "0",
             cost: `$${sp.cost ?? "0"}`,
+            sanity: sp.sanity ?? "0",
           })}
+        </p>
+      )}
+      {sp.sanityWritten !== undefined && (
+        <p className="notice" role="status">
+          {fill(t.admin.sanityReport, {
+            tests: sp.sanityTests ?? "0",
+            written: sp.sanityWritten ?? "0",
+            failed: sp.sanityFailed ?? "0",
+            cost: `$${sp.sanityCost ?? "0"}`,
+          })}
+        </p>
+      )}
+      {sp.sanityError && (
+        <p className="notice error" role="alert">
+          {t.admin.sanityCannot}
         </p>
       )}
 
@@ -166,6 +234,7 @@ export default async function AdminPage({ params, searchParams }: Props) {
                 <label htmlFor={`market-${q.id}`}>{t.ui.marketUrl}</label>
                 <input id={`market-${q.id}`} name="marketUrl" type="url" dir="ltr" placeholder="https://polymarket.com/event/..." />
               </div>
+              <SanityFields q={q} t={t} />
               <button className="btn small" type="submit">
                 {t.admin.approve}
               </button>
@@ -207,6 +276,31 @@ export default async function AdminPage({ params, searchParams }: Props) {
                         {t.questions.resolves} {formatDate(q.resolveBy, locale)}
                       </span>
                     </div>
+                    <details className="sanity-admin" style={{ marginTop: "0.6rem" }}>
+                      <summary className="small" style={{ cursor: "pointer" }}>
+                        <strong>{t.admin.sanity}</strong>:{" "}
+                        {sanityAnswers.has(q.id)
+                          ? fill(t.admin.sanityStarted, { n: sanityAnswers.get(q.id) ?? 0 })
+                          : t.admin.sanityNone}
+                      </summary>
+                      <form action={saveSanitySettings} style={{ marginTop: "0.7rem" }}>
+                        <input type="hidden" name="locale" value={locale} />
+                        <input type="hidden" name="id" value={q.id} />
+                        <SanityFields q={q} t={t} />
+                        <button className="btn small quiet" type="submit">
+                          {t.admin.sanitySave}
+                        </button>
+                      </form>
+                      {q.status === "open" && (
+                        <form action={runSanityNow} style={{ marginTop: "0.6rem" }}>
+                          <input type="hidden" name="locale" value={locale} />
+                          <input type="hidden" name="id" value={q.id} />
+                          <button className="btn small" type="submit">
+                            {t.admin.sanityRun}
+                          </button>
+                        </form>
+                      )}
+                    </details>
                   </td>
                   <td>
                     <form action={resolveQuestion} style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", justifyContent: "flex-end" }}>

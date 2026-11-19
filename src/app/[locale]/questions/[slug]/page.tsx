@@ -4,9 +4,10 @@ import { notFound } from "next/navigation";
 import { marketSettings } from "../../../../../sanity.config";
 import { Bar } from "@/components/Bar";
 import { QuestionMeta } from "@/components/QuestionCard";
+import { SanitySection } from "@/components/Sanity";
 import { marketLabel } from "@/engine/markets";
 import { fill, formatDate, localeFrom, pct } from "@/i18n";
-import { getQuestion, latestPerModel, pick } from "@/lib/data";
+import { getQuestion, getQuestionSanity, latestPerModel, pick } from "@/lib/data";
 import { brier, median } from "@/lib/scoring";
 import { tracks, type Track } from "@/lib/site";
 
@@ -31,6 +32,7 @@ export default async function QuestionPage({ params, searchParams }: Props) {
   if (!view || view.question.status === "pending" || view.question.status === "rejected") notFound();
 
   const q = view.question;
+  const sanity = await getQuestionSanity(q, view.models);
   const track: Track = (await searchParams).track === "open" ? "open" : "closed";
   const latest = latestPerModel(view.forecasts, view.models, track).sort(
     (a, b) => b.forecast.probability - a.forecast.probability,
@@ -224,6 +226,8 @@ export default async function QuestionPage({ params, searchParams }: Props) {
           </p>
         )}
       </section>
+
+      {sanity && sanity.results.length > 0 && <SanitySection sanity={sanity} question={q} t={t} locale={locale} />}
 
       <section className="section">
         <div className="cta-band">

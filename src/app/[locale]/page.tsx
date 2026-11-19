@@ -2,17 +2,25 @@ import Link from "next/link";
 import { Bar } from "@/components/Bar";
 import { AskIcon, DecideIcon, ForecastIcon } from "@/components/Icons";
 import { QuestionCard } from "@/components/QuestionCard";
+import { ContradictionCard } from "@/components/Sanity";
 import { localeFrom } from "@/i18n";
-import { getLeaderboard, listQuestions } from "@/lib/data";
+import { biggestContradiction, getLeaderboard, getSanityBoard, listQuestions } from "@/lib/data";
 import { categories } from "@/lib/site";
+import { now } from "@/lib/time";
+
+const WEEK = 7 * 24 * 60 * 60 * 1000;
 
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
   const { locale, t } = localeFrom((await params).locale);
-  const [open, resolved, board] = await Promise.all([
+  const [open, resolved, board, sanityBoard] = await Promise.all([
     listQuestions(locale, ["open"]),
     listQuestions(locale, ["resolved"]),
     getLeaderboard(locale, "closed"),
+    getSanityBoard(locale),
   ]);
+  // The week's biggest contradiction; before there is one, the biggest so far.
+  const weekly = biggestContradiction(sanityBoard.entries, new Date(now().getTime() - WEEK));
+  const caught = weekly ?? biggestContradiction(sanityBoard.entries);
 
   // The featured card is live data: the open question the models disagree on most.
   const featured = [...open].sort((a, b) => b.spread - a.spread)[0];
@@ -63,6 +71,31 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           ))}
         </ol>
       </section>
+
+      {caught && (
+        <section className="section">
+          <div className="section-head">
+            <div>
+              <h2>{weekly ? t.sanity.worstWeek : t.sanity.worstEver}</h2>
+              <p className="muted" style={{ marginTop: "0.25rem" }}>
+                {t.sanity.worstBody}
+              </p>
+            </div>
+            <Link className="link" href={`/${locale}/leaderboard?track=sanity`}>
+              {t.sanity.seeBoard}
+            </Link>
+          </div>
+          <div style={{ maxWidth: "46rem" }}>
+            <ContradictionCard
+              r={caught.result}
+              modelName={caught.model.name}
+              modelId={caught.model.id}
+              ctx={{ t, locale, question: caught.question, test: caught.test }}
+              feature
+            />
+          </div>
+        </section>
+      )}
 
       <section className="section">
         <div className="section-head">

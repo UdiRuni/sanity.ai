@@ -7,9 +7,10 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDb, schema } from "@/db/client";
 import { parseMarketUrl } from "@/engine/markets";
-import { runForecastRound } from "@/engine/run";
+import type { Localized } from "@/db/schema";
+import { isSanityTestable, runForecastRound, runSanityTestNow } from "@/engine/run";
 import { ADMIN_COOKIE, adminToken, hashPassword, isAdmin } from "@/lib/admin";
-import { categories, editionOf, isLocale, type Locale } from "@/lib/site";
+import { categories, editionOf, isLocale, site, type Locale } from "@/lib/site";
 
 const DAY = 24 * 60 * 60 * 1000;
 const VISITOR_COOKIE = "sanity_visitor";
@@ -124,6 +125,29 @@ export async function adminLogout(form: FormData) {
   redirect(`/${localeOf(form)}/admin`);
 }
 
+/**
+ * Reads the sanity test settings shared by the approval form and the settings
+ * form: whether the question is about something happening by its date, and a
+ * translation into another site language for the language check. An empty
+ * translation field removes that translation; the original text is never touched.
+ */
+function sanityFields(form: FormData, q: { lang: string; title: Localized; criteria: Localized }) {
+  const other = String(form.get("otherLang") ?? "");
+  const eventByDeadline = form.get("eventByDeadline") === "on";
+  if (!(site.locales as readonly string[]).includes(other) || other === q.lang) {
+    return { eventByDeadline, title: q.title, criteria: q.criteria };
+  }
+  const titleOther = String(form.get("titleOther") ?? "").trim().slice(0, 200);
+  const criteriaOther = String(form.get("criteriaOther") ?? "").trim().slice(0, 600);
+  const title: Localized = { ...q.title };
+  const criteria: Localized = { ...q.criteria };
+  if (titleOther) title[other] = titleOther;
+  else delete title[other];
+  if (criteriaOther) criteria[other] = criteriaOther;
+  else delete criteria[other];
+  return { eventByDeadline, title, criteria };
+}
+
 export async function approveQuestion(form: FormData) {
   await requireAdmin();
   const locale = localeOf(form);
@@ -138,12 +162,19 @@ export async function approveQuestion(form: FormData) {
   const marketUrl = String(form.get("marketUrl") ?? "").trim();
   const marketRef = marketUrl ? parseMarketUrl(marketUrl) : null;
   const now = new Date();
+  const edited = {
+    ...q,
+    title: title ? { ...q.title, [q.lang]: title } : q.title,
+    criteria: criteria ? { ...q.criteria, [q.lang]: criteria } : q.criteria,
+  };
+  const sanity = sanityFields(form, edited);
   await db
     .update(schema.questions)
     .set({
       status: "open",
-      title: title ? { ...q.title, [q.lang]: title } : q.title,
-      criteria: criteria ? { ...q.criteria, [q.lang]: criteria } : q.criteria,
+      title: sanity.title,
+      criteria: sanity.criteria,
+      eventByDeadline: sanity.eventByDeadline,
       edition: edition === "global" ? "global" : q.edition,
       // An unrecognised market URL is kept, with prices entered by hand.
       marketUrl: marketUrl || null,
@@ -225,6 +256,44 @@ export async function runRoundNow(form: FormData) {
     skipped: String(report.skipped),
     failed: String(report.failed.length),
     cost: report.costUsd.toFixed(2),
+    sanity: String(report.sanity.written),
+  });
+  redirect(`/${locale}/admin?${params}`);
+}
+
+/** Saves an open question's sanity test settings. */
+export async function saveSanitySettings(form: FormData) {
+  await requireAdmin();
+  const locale = localeOf(form);
+  const id = Number(form.get("id"));
+  if (!Number.isInteger(id)) return;
+  const db = await getDb();
+  const [q] = await db.select().from(schema.questions).where(eq(schema.questions.id, id));
+  if (!q || (q.status !== "open" && q.status !== "locked")) return;
+  const sanity = sanityFields(form, q);
+  await db
+    .update(schema.questions)
+    .set({ eventByDeadline: sanity.eventByDeadline, title: sanity.title, criteria: sanity.criteria })
+    .where(eq(schema.questions.id, id));
+  revalidatePath(`/${locale}`, "layout");
+}
+
+/** Starts the sanity test of one question now, outside the daily quota, and runs as much of it as fits. */
+export async function runSanityNow(form: FormData) {
+  await requireAdmin();
+  const locale = localeOf(form);
+  const id = Number(form.get("id"));
+  if (!Number.isInteger(id)) return;
+  const db = await getDb();
+  const [q] = await db.select().from(schema.questions).where(eq(schema.questions.id, id));
+  if (!q || !isSanityTestable(q, new Date())) redirect(`/${locale}/admin?sanityError=1`);
+  const report = await runSanityTestNow(id, { maxCalls: 60 });
+  revalidatePath(`/${locale}`, "layout");
+  const params = new URLSearchParams({
+    sanityTests: String(report.sanity.tests),
+    sanityWritten: String(report.sanity.written),
+    sanityFailed: String(report.failed.length),
+    sanityCost: report.costUsd.toFixed(2),
   });
   redirect(`/${locale}/admin?${params}`);
 }
