@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { sanity as sanitySettings } from "../../../../../sanity.config";
 import { CalibrationChart } from "@/components/CalibrationChart";
-import { formatDate, localeFrom, pct } from "@/i18n";
-import { getModelProfile, pick } from "@/lib/data";
+import { Dot } from "@/components/Dot";
+import { ContradictionCard } from "@/components/Sanity";
+import { fill, formatDate, localeFrom, pct } from "@/i18n";
+import { getModelProfile, getSanityBoard, pick } from "@/lib/data";
+import { allChecks, points } from "@/lib/sanity";
 
 type Props = { params: Promise<{ locale: string; id: string }> };
 
@@ -20,6 +24,14 @@ export default async function ModelPage({ params }: Props) {
   const profile = await getModelProfile(id, locale);
   if (!profile) notFound();
   const { model } = profile;
+  const sanityBoard = await getSanityBoard(locale);
+  const sanityRow = sanityBoard.rows.find((r) => r.model.id === id) ?? null;
+  const sanityRank = sanityRow?.ranked ? sanityBoard.rows.filter((r) => r.ranked).indexOf(sanityRow) + 1 : 0;
+  const contradictions = sanityBoard.entries
+    .filter((e) => e.model.id === id && !e.result.passed)
+    .sort((a, b) => b.result.contradiction - a.result.contradiction)
+    .slice(0, 4);
+  const checks = allChecks.filter((c) => sanitySettings.checks.includes(c));
 
   const list = (items: typeof profile.best) => (
     <table className="data">
@@ -56,7 +68,10 @@ export default async function ModelPage({ params }: Props) {
           {t.model.since} {formatDate(model.joinedAt, locale)}
         </span>
       </div>
-      <h1 style={{ marginTop: "0.8rem" }}>{model.name}</h1>
+      <h1 style={{ marginTop: "0.8rem", display: "flex", alignItems: "center", gap: "0.85rem" }}>
+        <Dot color={model.color} />
+        {model.name}
+      </h1>
 
       <div className="grid" style={{ marginTop: "1.75rem", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
         {profile.rows.map(({ track, row }) => (
@@ -76,7 +91,85 @@ export default async function ModelPage({ params }: Props) {
             </div>
           </div>
         )}
+        {sanityRow && (
+          <div className="panel soft">
+            <div className="figure" dir="ltr" style={{ textAlign: "start" }}>
+              {sanityRow.score.toFixed(1)}
+            </div>
+            <div className="figure-label">
+              {t.sanity.score} ({sanityRow.checks} {t.sanity.checksCount})
+            </div>
+          </div>
+        )}
       </div>
+
+      <section className="section" id="sanity">
+        <div className="section-head">
+          <div>
+            <h2>{t.sanity.name}</h2>
+            <p className="muted" style={{ marginTop: "0.25rem" }}>
+              {t.sanity.boardLead}
+            </p>
+          </div>
+          <Link className="link" href={`/${locale}/leaderboard?track=sanity`}>
+            {t.sanity.seeBoard}
+          </Link>
+        </div>
+        {!sanityRow ? (
+          <p className="muted">{t.sanity.empty}</p>
+        ) : (
+          <>
+            <div className="table-wrap">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>{t.sanity.check}</th>
+                    <th className="num">{t.sanity.avg}</th>
+                    <th className="num">{t.sanity.checksCount}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {checks.map((c) => {
+                    const cell = sanityRow.byCheck[c];
+                    return (
+                      <tr key={c}>
+                        <td>
+                          <strong>{t.sanity.checks[c]}</strong>
+                          <div className="small muted">{t.sanity.checkHints[c]}</div>
+                        </td>
+                        <td className="num">{cell ? points(cell.mean) : ""}</td>
+                        <td className="num">{cell?.n ?? 0}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <p className="small muted" style={{ marginTop: "0.8rem" }}>
+              {sanityRank > 0
+                ? `${fill(t.sanity.rankLine, { n: sanityRank })} `
+                : `${fill(t.sanity.warmupNote, { n: sanitySettings.minChecksForRank })} `}
+              {t.sanity.scoreNote}
+            </p>
+            {contradictions.length > 0 && (
+              <>
+                <h3 style={{ marginTop: "1.75rem" }}>{t.sanity.worstOfModel}</h3>
+                <div className="grid cascade" style={{ marginTop: "0.9rem" }}>
+                  {contradictions.map((e) => (
+                    <ContradictionCard
+                      key={`${e.question.id}-${e.result.check}`}
+                      r={e.result}
+                      modelName={model.name}
+                      modelId={model.id}
+                      ctx={{ t, locale, question: e.question, test: e.test }}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </section>
 
       <section className="section">
         <h2>{t.model.calibration}</h2>

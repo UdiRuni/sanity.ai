@@ -1,9 +1,12 @@
 import Link from "next/link";
 import type { Question } from "@/db/schema";
 import { fill, formatDate, pct, type Dictionary } from "@/i18n";
+import { toneClass } from "@/lib/colors";
 import { closestModel, pick, type QuestionView } from "@/lib/data";
 import type { Locale } from "@/lib/site";
+import { Arena } from "./Arena";
 import { Bar } from "./Bar";
+import { Num } from "./Num";
 
 export function StatusChip({ question, t }: { question: Question; t: Dictionary }) {
   if (question.status === "resolved" && question.outcome !== null) {
@@ -22,7 +25,9 @@ export function QuestionMeta({ question, t, locale }: { question: Question; t: D
   return (
     <div className="meta">
       <StatusChip question={question} t={t} />
-      <span className="chip">{t.category[question.category as keyof Dictionary["category"]] ?? question.category}</span>
+      <span className={`chip ${toneClass(question.category)}`}>
+        {t.category[question.category as keyof Dictionary["category"]] ?? question.category}
+      </span>
       {question.slug.startsWith("demo-") && <span className="chip demo">{t.questions.demo}</span>}
       <span>
         {t.questions.resolves} {formatDate(question.resolveBy, locale)}
@@ -58,7 +63,7 @@ export function QuestionCard({
   const TitleTag = feature ? "h2" : "h3";
 
   return (
-    <article className={`card ${feature ? "feature" : ""}`}>
+    <article className={`card ${feature ? "feature" : ""} ${toneClass(q.category)}`}>
       <QuestionMeta question={q} t={t} locale={locale} />
       <TitleTag className="card-title" style={feature ? { fontSize: "1.5rem" } : undefined}>
         <Link className="card-link" href={`/${locale}/questions/${q.slug}`}>
@@ -71,13 +76,19 @@ export function QuestionCard({
       ) : (
         <div>
           <div className="card-figure">
-            <span className={`figure ${feature ? "big" : ""}`}>{pct(view.median)}</span>
+            <span className={`figure ${feature ? "big" : ""}`}>
+              <Num value={view.median * 100} suffix="%" />
+            </span>
             <span className="figure-label">
               {t.ui.chance}, {t.ui.think}
             </span>
           </div>
           <div style={{ marginTop: "0.7rem" }}>
-            <Bar value={view.median} thick={feature} scale={feature} />
+            {feature && view.latest.length >= 2 ? (
+              <Arena latest={view.latest} t={t} legend={false} />
+            ) : (
+              <Bar value={view.median} thick={feature} scale={feature} color="var(--tone)" />
+            )}
           </div>
           <p className="small muted" style={{ marginTop: "0.6rem" }}>
             {closest
