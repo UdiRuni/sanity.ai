@@ -1,6 +1,7 @@
 import { count } from "drizzle-orm";
-import { hash, mockForecast } from "@/engine/mock";
+import { demoSkill, hash, mockForecast } from "@/engine/mock";
 import { modelRegistry } from "@/engine/registry";
+import { mockProbe, planSanityTest, SANITY_PROMPT_VERSION, variantsToRun } from "@/engine/sanity";
 import type { Db } from "./client";
 import * as schema from "./schema";
 
@@ -14,24 +15,15 @@ import * as schema from "./schema";
 
 const DAY = 24 * 60 * 60 * 1000;
 
-/** Fake per-model skill, only so the demo leaderboard is not a tie. */
-const demoSkill: Record<string, number> = {
-  "claude-opus-5-5": 0.82,
-  "gpt-sol": 0.8,
-  "gemini-4": 0.76,
-  "grok-4-7": 0.68,
-  "claude-haiku-5-5": 0.55,
-  "gpt-luna": 0.5,
-  deepseek: 0.58,
-  llama: 0.42,
-};
-
 type Seed = { he: string; en?: string; category: string };
 
-const openLocal: (Seed & { criteria: string; days: number })[] = [
+const openLocal: (Seed & { criteria: string; criteriaEn?: string; days: number; byDeadline?: boolean })[] = [
   {
     he: "האם בנק ישראל יוריד את הריבית בהחלטה הקרובה?",
     criteria: "בנק ישראל מודיע על הורדת ריבית בהחלטת הריבית הקרובה, לפי הודעה רשמית של הבנק.",
+    // Translations let the demo show the sanity test's language check.
+    en: "Will the Bank of Israel cut its interest rate at its next decision?",
+    criteriaEn: "The Bank of Israel announces a rate cut at its next interest rate decision, according to an official announcement by the bank.",
     category: "economy",
     days: 34,
   },
@@ -44,8 +36,11 @@ const openLocal: (Seed & { criteria: string; days: number })[] = [
   {
     he: "האם תקציב המדינה יאושר בכנסת בקריאה שלישית עד סוף הרבעון?",
     criteria: "הכנסת מאשרת את חוק התקציב בקריאה שלישית עד היום האחרון של הרבעון הנוכחי.",
+    en: "Will the Knesset pass the state budget in its third reading by the end of the quarter?",
+    criteriaEn: "The Knesset passes the budget law in its third reading by the last day of the current quarter.",
     category: "politics",
     days: 46,
+    byDeadline: true,
   },
   {
     he: "האם מכבי תל אביב תסיים את סיבוב הליגה הנוכחי במקום הראשון?",
@@ -67,7 +62,7 @@ const openLocal: (Seed & { criteria: string; days: number })[] = [
   },
 ];
 
-const openGlobal: (Seed & { criteriaEn: string; criteriaHe: string; days: number })[] = [
+const openGlobal: (Seed & { criteriaEn: string; criteriaHe: string; days: number; byDeadline?: boolean })[] = [
   {
     en: "Will the US Federal Reserve cut rates at its next meeting?",
     he: "האם הפדרל ריזרב יוריד ריבית בישיבה הקרובה?",
@@ -99,6 +94,7 @@ const openGlobal: (Seed & { criteriaEn: string; criteriaHe: string; days: number
     criteriaHe: "נאס\"א מאשרת שיגור של משימת ארטמיס מאוישת לפני היום האחרון של הרבעון הבא.",
     category: "science",
     days: 110,
+    byDeadline: true,
   },
 ];
 
@@ -161,6 +157,7 @@ export async function seed(db: Db, now = new Date()) {
     status: schema.QuestionStatus;
     outcome?: boolean;
     suggestedBy?: string;
+    eventByDeadline?: boolean;
   }) {
     const [row] = await db
       .insert(schema.questions)
@@ -238,8 +235,9 @@ export async function seed(db: Db, now = new Date()) {
       slug: `demo-il-open-${i + 1}`,
       edition: "il",
       lang: "he",
-      title: { he: q.he },
-      criteria: { he: q.criteria },
+      title: q.en ? { he: q.he, en: q.en } : { he: q.he },
+      criteria: q.criteriaEn ? { he: q.criteria, en: q.criteriaEn } : { he: q.criteria },
+      eventByDeadline: q.byDeadline ?? false,
       category: q.category,
       openAt,
       lockAt: new Date(resolveBy.getTime() - DAY),
@@ -263,6 +261,7 @@ export async function seed(db: Db, now = new Date()) {
       resolveBy,
       status: "open",
       suggestedBy: "Editors",
+      eventByDeadline: q.byDeadline ?? false,
     });
   }
 
@@ -331,5 +330,51 @@ export async function seed(db: Db, now = new Date()) {
   if (priceRows.length) await db.insert(schema.marketPrices).values(priceRows);
   for (let i = 0; i < forecastRows.length; i += 200) {
     await db.insert(schema.forecasts).values(forecastRows.slice(i, i + 200));
+  }
+  await seedSanityTests(db);
+}
+
+/** Demo sanity tests on a few open questions, asked two hours after each opened. */
+async function seedSanityTests(db: Db) {
+  const slugs = ["demo-il-open-1", "demo-il-open-3", "demo-global-open-1", "demo-global-open-3", "demo-global-open-4"];
+  const active = modelRegistry.filter((m) => m.active !== false);
+  const rows = await db.select().from(schema.questions);
+  const probeRows: (typeof schema.sanityProbes.$inferInsert)[] = [];
+  for (const q of rows.filter((r) => slugs.includes(r.slug))) {
+    const askedOn = new Date((q.openAt ?? q.createdAt).getTime() + 2 * 60 * 60 * 1000);
+    const plan = planSanityTest(q, askedOn);
+    const [test] = await db
+      .insert(schema.sanityTests)
+      .values({
+        questionId: q.id,
+        promptVersion: SANITY_PROMPT_VERSION,
+        askedOn,
+        earlierBy: plan.earlierBy,
+        translateTo: plan.translateTo,
+        createdAt: askedOn,
+      })
+      .returning({ id: schema.sanityTests.id });
+    for (const m of active) {
+      for (const variant of variantsToRun(plan)) {
+        const answer = mockProbe({
+          questionSlug: q.slug,
+          modelId: m.id,
+          variant,
+          lang: variant === "translated" && plan.translateTo ? plan.translateTo : q.lang,
+        });
+        probeRows.push({
+          testId: test.id,
+          modelId: m.id,
+          variant,
+          probability: answer.probability,
+          rationale: answer.rationale,
+          mock: true,
+          createdAt: askedOn,
+        });
+      }
+    }
+  }
+  for (let i = 0; i < probeRows.length; i += 200) {
+    await db.insert(schema.sanityProbes).values(probeRows.slice(i, i + 200));
   }
 }

@@ -2,11 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { marketSettings } from "../../../../../sanity.config";
+import { Arena } from "@/components/Arena";
 import { Bar } from "@/components/Bar";
+import { CtaBand } from "@/components/CtaBand";
+import { Dot } from "@/components/Dot";
+import { Num } from "@/components/Num";
 import { QuestionMeta } from "@/components/QuestionCard";
+import { SanitySection } from "@/components/Sanity";
 import { marketLabel } from "@/engine/markets";
 import { fill, formatDate, localeFrom, pct } from "@/i18n";
-import { getQuestion, latestPerModel, pick } from "@/lib/data";
+import { toneClass } from "@/lib/colors";
+import { getQuestion, getQuestionSanity, latestPerModel, pick } from "@/lib/data";
 import { brier, median } from "@/lib/scoring";
 import { tracks, type Track } from "@/lib/site";
 
@@ -31,6 +37,7 @@ export default async function QuestionPage({ params, searchParams }: Props) {
   if (!view || view.question.status === "pending" || view.question.status === "rejected") notFound();
 
   const q = view.question;
+  const sanity = await getQuestionSanity(q, view.models);
   const track: Track = (await searchParams).track === "open" ? "open" : "closed";
   const latest = latestPerModel(view.forecasts, view.models, track).sort(
     (a, b) => b.forecast.probability - a.forecast.probability,
@@ -59,14 +66,18 @@ export default async function QuestionPage({ params, searchParams }: Props) {
         </p>
       )}
 
-      <section className="card feature" style={{ marginTop: "1.5rem" }}>
+      <section className={`card feature ${toneClass(q.category)}`} style={{ marginTop: "1.5rem" }}>
         <div className="card-figure">
-          <span className="figure big">{med === null ? "?" : pct(med)}</span>
+          <span className="figure big">{med === null ? "?" : <Num value={med * 100} suffix="%" />}</span>
           <span className="figure-label">
             {t.ui.chance}, {t.ui.think}
           </span>
         </div>
-        {med !== null && <Bar value={med} thick scale />}
+        {latest.length >= 2 ? (
+          <Arena latest={latest} t={t} />
+        ) : (
+          med !== null && <Bar value={med} thick scale color="var(--tone)" />
+        )}
         {ps.length > 1 && (
           <p className="muted">
             {fill(t.ui.between, { low: pct(Math.min(...ps)), high: pct(Math.max(...ps)) })}
@@ -128,8 +139,8 @@ export default async function QuestionPage({ params, searchParams }: Props) {
             {t.rail.noForecasts}
           </p>
         ) : (
-          <div className="rows" style={{ marginTop: "1rem" }}>
-            {latest.map(({ model, forecast }) => {
+          <div className="rows cascade" style={{ marginTop: "1rem" }}>
+            {latest.map(({ model, forecast }, i) => {
               const history = view.forecasts
                 .filter((f) => f.modelId === model.id && f.track === track)
                 .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
@@ -140,9 +151,15 @@ export default async function QuestionPage({ params, searchParams }: Props) {
                       <span className="caret" aria-hidden="true">
                         ▸
                       </span>
+                      <Dot color={model.color} />
                       {model.name}
                     </span>
-                    <Bar value={forecast.probability} label={`${model.name}: ${pct(forecast.probability)}`} />
+                    <Bar
+                      value={forecast.probability}
+                      label={`${model.name}: ${pct(forecast.probability)}`}
+                      color={model.color}
+                      index={i}
+                    />
                     <span className="row-value">{pct(forecast.probability)}</span>
                   </summary>
                   <div className="row-body">
@@ -225,17 +242,9 @@ export default async function QuestionPage({ params, searchParams }: Props) {
         )}
       </section>
 
-      <section className="section">
-        <div className="cta-band">
-          <div>
-            <h2>{t.ui.ctaTitle}</h2>
-            <p>{t.ui.ctaBody}</p>
-          </div>
-          <Link className="btn big" href={`/${locale}/suggest`}>
-            {t.home.heroCta}
-          </Link>
-        </div>
-      </section>
+      {sanity && sanity.results.length > 0 && <SanitySection sanity={sanity} question={q} t={t} locale={locale} />}
+
+      <CtaBand t={t} locale={locale} />
     </article>
   );
 }
